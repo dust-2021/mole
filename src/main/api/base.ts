@@ -17,8 +17,8 @@ export async function fetch(svr: server, method: string, url: string, withToken:
     const host = `${svr.host}:${svr.port}`;
     const headers = new AxiosHeaders();
     headers.set("Accept", "application/json");
-    if (withToken) {
-        // headers.set("Token", svr?.);
+    if (withToken && svr.token) {
+        headers.set("Token", svr.token);
     }
     let resp: AxiosResponse | null = null;
     const res: HttpResp = {success: false, statusCode: 0};
@@ -53,6 +53,7 @@ export async function fetch(svr: server, method: string, url: string, withToken:
     res.success = resp.status === 200;
     if (!res.success) {
         res.msg = resp.statusText;
+        res.statusCode = resp.status;
         return res;
     }
     // 接口请求结果

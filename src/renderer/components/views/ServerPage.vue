@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {ref, onBeforeMount} from "vue";
-import {HttpResp, HttpReq, request} from '../../utils/ipcTypes'
+import {ref, onBeforeMount, watch} from "vue";
+import {useRouter} from 'vue-router'
+import {HttpResp, HttpReq, request, Services, server} from '../../utils/ipcTypes'
 
 const props = defineProps({
   name: {
@@ -8,8 +9,10 @@ const props = defineProps({
     required: true,
   }
 })
+let isMounted = ref(false);
 let status = ref(true);
 let ping = ref(0);
+let svr = ref<server>(null);
 
 async function checkHost(): Promise<void> {
   const req: HttpReq = {serverName: props.name, apiName: 'serverTime'};
@@ -20,32 +23,33 @@ async function checkHost(): Promise<void> {
 
 onBeforeMount(async () => {
   await checkHost();
+  svr.value = await Services.get(props.name);
+  isMounted.value = true;
 });
+
+watch(() => props.name, (val) => {
+  checkHost();
+})
 
 </script>
 
 <template>
-  <div style="height: 100%">
-    <el-tabs type="border-card" style="height: 100%;">
+  <div style="height: 100%" v-show="isMounted">
+    <el-empty :description="`无法连接到服务器`" v-if="!status"></el-empty>
+    <el-tabs style="height: 100%; padding: 0 2%" v-else>
       <el-tab-pane label="首页">
-        <el-empty :description="`无法连接到服务器`" v-if="!status"></el-empty>
 
-        <div v-if="status">
-          <el-header height="5%">
-          <el-row>
-
-          </el-row>
-          </el-header>
-          <el-scrollbar>
-
-          </el-scrollbar>
-        </div>
       </el-tab-pane>
-      <el-tab-pane label="信息"></el-tab-pane>
+      <el-tab-pane label="信息">
+        <el-descriptions :title="name" :column="3" border>
+          <el-descriptions-item label="地址：">{{ svr.host }}</el-descriptions-item>
+          <el-descriptions-item>
+
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-tab-pane>
       <el-tab-pane label="设置">
-        <el-button type="danger">
-          删除
-        </el-button>
+
       </el-tab-pane>
     </el-tabs>
 

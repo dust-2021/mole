@@ -6,14 +6,22 @@ import {HttpResp, server} from "@/main/public/public";
 export async function login(server: server, name: string, password: string): Promise<HttpResp> {
 
     const data = new Map<string, any>([["username", name], ["password", password]]);
-    return fetch(server, "post", "api/login", false, data)
+    const resp = await fetch(server, "post", "api/login", false, data);
+    if (resp.success && resp.statusCode === 0) {
+        server.token = String(resp.data);
+    }
+    return resp;
 }
 
 export async function logout(server: server): Promise<HttpResp> {
-    return fetch(server, "post", "sapi/logout", true)
+    const resp = await fetch(server, "get", "sapi/logout", true)
+    if (resp.success && resp.statusCode === 0) {
+        server.token = undefined;
+    }
+    return resp;
 }
 
 export async function register(server: server, name: string, password: string): Promise<HttpResp> {
     const data = new Map<string, any>([["username", name], ["password", password]]);
-    return fetch(server, "post", "api/register", false, data)
+    return  fetch(server, "post", "api/register", false, data)
 }

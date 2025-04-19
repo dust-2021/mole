@@ -37,7 +37,7 @@
       <el-aside width="200px" style="border-right: 1px solid #eee">
         <ServerItems v-if="show === `server`"></ServerItems>
       </el-aside>
-      <el-main>
+      <el-main style="padding: 0">
         <router-view></router-view>
       </el-main>
     </el-container>

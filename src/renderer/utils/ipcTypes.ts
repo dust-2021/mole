@@ -35,8 +35,11 @@ export type server = {
     port: number;
     users: user[];
     defaultUser?: user;
+    token?: string;
 }
-
+/*
+* 封装的ipc数据类型，原数据存储在electron主进程中，通过接口函数操作原数据
+* */
 export class IPCContainer<T> {
     private readonly name: string;
 
@@ -70,7 +73,8 @@ export class IPCContainer<T> {
     }
 
 }
-
+// 全部服务器信息
 export const Services = new IPCContainer<server>('Services');
+// 全部变量
 export const Public = new IPCContainer<any>('Public');
 

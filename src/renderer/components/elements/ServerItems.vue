@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {Connection} from '@element-plus/icons-vue'
+import {Connection, CirclePlusFilled, RemoveFilled} from '@element-plus/icons-vue'
 import {onBeforeMount, ref} from "vue";
 import {useRouter} from "vue-router";
 import {Services, server, request, user} from '../../utils/ipcTypes'
@@ -13,6 +13,10 @@ async function init(): Promise<void> {
   token.value = new Map<string, string>();
 }
 
+function deleteServer(serverName: string) {
+  services.value.delete(serverName);
+}
+
 const router = useRouter();
 
 function serverDetails(name: string): void {
@@ -22,9 +26,10 @@ function serverDetails(name: string): void {
 async function login(serviceName: string, user?: user): Promise<void> {
   if (token.value.get(serviceName)) {
     token.value.delete(serviceName);
+    await request({apiName: 'logout', serverName: serviceName})
     return;
   }
-  if (!user){
+  if (!user) {
     user = services.value.get(serviceName).defaultUser;
   }
   if (!user) {
@@ -46,27 +51,42 @@ onBeforeMount(init);
 
 <template>
   <div style="height: 100%">
-    <div style="height: 5%;">
-      <h5 style="height: 100%;text-align: center;margin: 0;align-items: center; border-bottom: 1px solid #eeeeee;user-select: none;cursor: default;">
-        服务器</h5>
+    <div style="height: 10%; border-bottom: 1px #eee solid;">
+      <el-row style="height: 100%">
+        <el-col :span="12" style="padding: 5% 10%;">
+          <el-button style=" width: 80%">
+            <el-icon style="height: 100%">
+              <CirclePlusFilled></CirclePlusFilled>
+            </el-icon>
+          </el-button>
+        </el-col>
+        <el-col :span="12" style="padding: 5% 10%">
+          <el-button style=" width: 80%">
+            <el-icon style="height: 100%">
+              <RemoveFilled></RemoveFilled>
+            </el-icon>
+          </el-button>
+        </el-col>
+      </el-row>
     </div>
-    <div style="height: 95%">
-      <el-scrollbar :always="false" max-height="80%">
+
+    <div style="height: 85%">
+      <el-scrollbar :always="false" max-height="100%">
         <el-row v-for="(item, index) in services" :index="index" class="hover-box">
           <el-col :span="16">
 
-            <el-popover
-                trigger="hover"
-                :title="item[0]"
-                placement="right"
-                :content="item[1].host + ':' + item[1].port"
-            >
-              <template #reference>
+<!--            <el-popover-->
+<!--                trigger="hover"-->
+<!--                :title="item[0]"-->
+<!--                placement="right"-->
+<!--                :content="item[1].host + ':' + item[1].port"-->
+<!--            >-->
+<!--              <template #reference>-->
                 <el-button style="width: 80%" @click="serverDetails(item[0])">
                   {{ item[0].length <= 5 ? item[0] : item[0].substring(0, 5) + '...' }}
                 </el-button>
-              </template>
-            </el-popover>
+<!--              </template>-->
+<!--            </el-popover>-->
           </el-col>
           <el-col :span="8">
             <el-button :color="token.get(item[0])? `blue`: `white`"

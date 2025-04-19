@@ -1,9 +1,9 @@
-import {Api, Services, HttpReq, HttpResp, Windows, wsHandler} from "../public/public";
+import {Api, Services, ipcHttpReq, HttpResp, wsReqBody, wsRespBody, Windows, wsHandler} from "../public/public";
 import Event = Electron.IpcMainInvokeEvent;
 import {Connection} from "../ws/connection";
 
 // 向服务器发送请求
-export async function request(event: Event, req: HttpReq): Promise<HttpResp> {
+export async function request(event: Event, req: ipcHttpReq): Promise<HttpResp> {
     const win = Windows.get('main');
     try {
         const f = Api.get(req.apiName);
@@ -16,12 +16,12 @@ export async function request(event: Event, req: HttpReq): Promise<HttpResp> {
             win?.webContents.send('msg', "server Not Found", 'error');
             return {success: false, statusCode: 0, msg: "server Not Found"};
         }
-        if (req.args !== undefined && req.args !== null) {
-
-            return await f(svr, ...req.args);
-        } else {
-            return await f(svr);
+        const args: any[] = req.args ? req.args : [];
+        const resp = await f(svr, ...args)
+        if (!resp.success) {
+            win?.webContents.send('msg', `${req.serverName}/${req.apiName} failed code: ${resp.statusCode}`, 'error');
         }
+        return resp;
     } catch (error: any) {
         win?.webContents.send('msg', "api call error:" + error.message, 'error');
         return {success: false, statusCode: 0, msg: "api call error:" + error.message};

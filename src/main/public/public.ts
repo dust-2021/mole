@@ -84,7 +84,7 @@ export type HttpResp = {
 }
 
 // ipc传递http请求规范
-export type HttpReq = {
+export type ipcHttpReq = {
     serverName: string,
     apiName: string,
     args: any[]
@@ -113,6 +113,7 @@ export type server = {
     port: number;
     users: user[];
     defaultUser?: user;
+    token?: string;
 }
 
 export type httpHandler = (svr: server, ...args: any) => Promise<HttpResp>
@@ -122,6 +123,8 @@ export type wsHandler = (r: wsRespBody) => Promise<any>;
 export const Public = new globals<any>('Public');
 // 服务器接口
 export const Api = new globals<httpHandler>('Api');
+
+export const WsApi = new globals<wsHandler>('WsApi');
 // 服务器
 export const Services = new globals<server>('Services');
 // 渲染窗口
