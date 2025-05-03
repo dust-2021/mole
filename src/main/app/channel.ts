@@ -1,4 +1,4 @@
-import {Api, Services, ipcHttpReq, HttpResp, wsReqBody, wsRespBody, Windows, wsHandler} from "../public/public";
+import {Api, Services, ipcHttpReq, HttpResp, wsReqBody, wsRespBody, Windows, wsHandler, Logger} from "../public/public";
 import Event = Electron.IpcMainInvokeEvent;
 import {Connection} from "../ws/connection";
 
@@ -19,11 +19,14 @@ export async function request(event: Event, req: ipcHttpReq): Promise<HttpResp> 
         const args: any[] = req.args ? req.args : [];
         const resp = await f(svr, ...args)
         if (!resp.success) {
-            win?.webContents.send('msg', `${req.serverName}/${req.apiName} failed code: ${resp.statusCode}`, 'error');
+            const msg = `${req.serverName}-${req.apiName} failed code: ${resp.statusCode}`;
+            win?.webContents.send('msg', msg, 'error');
+            Logger.warn(msg)
         }
         return resp;
     } catch (error: any) {
         win?.webContents.send('msg', "api call error:" + error.message, 'error');
+        Logger.error("api call error:" + error.message);
         return {success: false, statusCode: 0, msg: "api call error:" + error.message};
     }
 }

@@ -9,9 +9,12 @@ const storePath = app.getPath('userData');
 
 class globals<T> {
     private readonly data = new Map<string, T>();
-    private readonly storeKey: string;
+    private readonly storeKey: string = "";
 
-    constructor(storeKey: string) {
+    constructor(storeKey?: string) {
+        if (!storeKey) {
+            return;
+        }
         this.storeKey = storeKey;
         const p = path.join(storePath, storeKey + '.memory');
         try {
@@ -26,12 +29,12 @@ class globals<T> {
         this.data.set(key, data);
     }
 
-    public get(key: string): T | null {
+    public get(key: string, defaultValue?: T): T | null {
         const item = this.data.get(key);
         if (item) {
             return item;
         }
-        return null;
+        return defaultValue ? defaultValue : null;
     }
 
     public delete(key: string): void {
@@ -71,6 +74,9 @@ class globals<T> {
     }
 
     public save(): void {
+        if (!this.storeKey){
+            return;
+        }
         fs.writeFileSync(path.join(storePath, this.storeKey + '.memory'), JSON.stringify(Array.from(this.data)));
     }
 }
@@ -121,11 +127,31 @@ export type wsHandler = (r: wsRespBody) => Promise<any>;
 
 // 全局变量
 export const Public = new globals<any>('Public');
+// app设置
+export const Configs = new globals<any>('Configs');
 // 服务器接口
-export const Api = new globals<httpHandler>('Api');
+export const Api = new globals<httpHandler>();
 
-export const WsApi = new globals<wsHandler>('WsApi');
+export const WsApi = new globals<wsHandler>();
 // 服务器
 export const Services = new globals<server>('Services');
 // 渲染窗口
-export const Windows = new globals<BrowserWindow>('Windows');
+export const Windows = new globals<BrowserWindow>();
+
+import winston = require('winston');
+
+// 配置日志记录器
+const logPath = path.join(storePath, 'logs');
+const logFile = path.join(logPath, 'app.log');
+
+export const Logger = winston.createLogger({
+    level: Configs.get("logLevel", "info"), // 默认日志级别
+    transports: [
+        new winston.transports.Console({ format: winston.format.simple() }),  // 控制台输出
+        new winston.transports.File({ filename: logFile, format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level}: ${message}`)
+            ) })  // 日志文件输出
+    ]
+});
+

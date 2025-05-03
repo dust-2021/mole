@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import {Connection, CirclePlusFilled, RemoveFilled} from '@element-plus/icons-vue'
-import {onBeforeMount, ref} from "vue";
 import {useRouter} from "vue-router";
-import {Services, server, request, user} from '../../utils/ipcTypes'
+import { server, request, user} from '../../utils/ipcTypes'
+import {Services} from '../../utils/stores'
 import {ElMessage} from 'element-plus'
 
-let services = ref<Map<string, server>>(null);
-let token = ref<Map<string, string>>();
 
-async function init(): Promise<void> {
-  services.value = await Services.all();
-  token.value = new Map<string, string>();
-}
+const svr = Services();
+svr.init();
 
 function deleteServer(serverName: string) {
-  services.value.delete(serverName);
+  svr.delete(serverName);
 }
 
 const router = useRouter();
@@ -24,13 +20,18 @@ function serverDetails(name: string): void {
 }
 
 async function login(serviceName: string, user?: user): Promise<void> {
-  if (token.value.get(serviceName)) {
-    token.value.delete(serviceName);
+  const s: server = svr.get(serviceName);
+  if (s === undefined) {
+    return ;
+  }
+  // token已存在则登出
+  if (s.token) {
+    s.token = "";
     await request({apiName: 'logout', serverName: serviceName})
     return;
   }
   if (!user) {
-    user = services.value.get(serviceName).defaultUser;
+    user = s.defaultUser;
   }
   if (!user) {
     ElMessage({
@@ -42,11 +43,9 @@ async function login(serviceName: string, user?: user): Promise<void> {
   }
   const resp = await request({apiName: 'login', serverName: serviceName, args: [user.username, user.password]});
   if (resp.success && resp.statusCode === 0) {
-    token.value.set(serviceName, resp.data);
+    s.token = resp.data;
   }
 }
-
-onBeforeMount(init);
 </script>
 
 <template>
@@ -72,24 +71,14 @@ onBeforeMount(init);
 
     <div style="height: 85%">
       <el-scrollbar :always="false" max-height="100%">
-        <el-row v-for="(item, index) in services" :index="index" class="hover-box">
+        <el-row v-for="(item, index) in svr.all" :index="index" class="hover-box">
           <el-col :span="16">
-
-<!--            <el-popover-->
-<!--                trigger="hover"-->
-<!--                :title="item[0]"-->
-<!--                placement="right"-->
-<!--                :content="item[1].host + ':' + item[1].port"-->
-<!--            >-->
-<!--              <template #reference>-->
                 <el-button style="width: 80%" @click="serverDetails(item[0])">
                   {{ item[0].length <= 5 ? item[0] : item[0].substring(0, 5) + '...' }}
                 </el-button>
-<!--              </template>-->
-<!--            </el-popover>-->
           </el-col>
           <el-col :span="8">
-            <el-button :color="token.get(item[0])? `blue`: `white`"
+            <el-button :color="item[1].token? `blue`: `white`"
                        style="border: 0" @click="login(item[0])" v-if="item[1].defaultUser">
               <el-icon :size="16">
                 <Connection></Connection>

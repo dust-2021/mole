@@ -13,15 +13,22 @@ export type HttpResp = {
     msg?: string
 }
 
-//
+// 发送ipc信号
 export async function ipcSend(msg: string) {
     await window['electron'].send(msg);
 }
 
+// ipc事件监听
 export function ipcOn(channel: string, func: (...args: any[])=> void){
     window['electron'].on(channel, func);
 }
 
+// 取消ipc事件监听
+export function ipcRemove(channel: string, func: (...args: any[]) => void) {
+    window['electron'].remove(channel, func);
+}
+
+// 使用ipc调用对服务器的http网络请求
 export async function request(req: HttpReq): Promise<HttpResp> {
     return await window['electron'].invoke('request', req);
 }
@@ -47,7 +54,7 @@ export class IPCContainer<T> {
         this.name = name;
     }
 
-    public async get(key: string): Promise<T> {
+    public async get(key: string): Promise<T | null> {
         return await window['electron'].invoke(this.name, 'get', key)
     }
 

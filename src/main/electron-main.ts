@@ -1,7 +1,7 @@
 import {app, ipcMain, Menu} from 'electron';
 import {mainWindow} from "./app/window";
 import {initialize} from "./init";
-import {Services, Public} from './public/public'
+import {Services, Public, Configs} from './public/public'
 
 initialize(ipcMain);
 
@@ -17,4 +17,5 @@ app.on('window-all-closed', (): void => {
 app.on('before-quit', (): void => {
     Services.save();
     Public.save();
+    Configs.save();
 })

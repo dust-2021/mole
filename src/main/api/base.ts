@@ -12,6 +12,7 @@ function queryFormatter(data: Map<string, any>): string {
 
 /* 向服务器发送请求
 * 成功：{"code": 0, "data": any}  失败：{"code": int, "message": str}
+*
 * */
 export async function fetch(svr: server, method: string, url: string, withToken: boolean, data?: Map<string, any>): Promise<HttpResp> {
     const host = `${svr.host}:${svr.port}`;

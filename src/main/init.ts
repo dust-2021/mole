@@ -1,15 +1,14 @@
 import {Api, Public, Services} from './public/public';
-import {login, logout, register} from './api/user';
-import {serverTime} from './api/server';
+import {registerApis as userApi} from './api/user';
+import {registerApis as systemApi} from './api/server';
 import path from 'path';
 import {ipcMain} from "electron";
 import {request, wsRequest} from "./app/channel";
+import {natHandler} from './ws/nat'
 
 function initialApi() {
-    Api.set("login", login);
-    Api.set("logout", logout);
-    Api.set("register", register);
-    Api.set("serverTime", serverTime);
+    userApi();
+    systemApi();
 }
 
 // 注册主进程和渲染进程通信接口
@@ -26,7 +25,8 @@ export function initialIPC(ipc: typeof ipcMain) {
 
 export function initialize(ipc: typeof ipcMain) {
     Public.set("basedir", path.dirname(__dirname));
-    Services.set("default", {host: "http://127.0.0.1", port: 8000, users: [], defaultUser: {username: '13900004990', password: '123456'}})
+    // natHandler.stun("127.0.0.1", 8001).then();
+    Services.set("default", {host: "http://127.0.0.1", port: 8000, users: [], defaultUser: {username: 'mole', password: '123456'}})
     initialIPC(ipc);
     initialApi();
 }
