@@ -13,6 +13,19 @@ export type HttpResp = {
     msg?: string
 }
 
+export type ipcWsReq = {
+    serverName: string,
+    uuid: string,
+    apiName: string,
+    args: any[]
+}
+
+export type wsResp = {
+    id: string;
+    method: string;
+    statusCode: number;
+    data: any;
+};
 // 发送ipc信号
 export async function ipcSend(msg: string) {
     await window['electron'].send(msg);
@@ -28,15 +41,31 @@ export function ipcRemove(channel: string, func: (...args: any[]) => void) {
     window['electron'].remove(channel, func);
 }
 
+export function ipcOnce(channel: string, func: (...args: any[]) => void) {
+    window['electron'].once(channel, func);
+}
+
 // 使用ipc调用对服务器的http网络请求
 export async function request(req: HttpReq): Promise<HttpResp> {
     return await window['electron'].invoke('request', req);
 }
 
+export async function wsRequest(req: ipcWsReq) {
+    return await window['electron'].invoke("wsRequest", req);
+}
+
+// 账号信息
 export type user = {
     username: string,
     password: string,
 }
+
+export type connection = {
+    connected: boolean,
+    user: user,
+}
+
+// 服务器信息
 export type server = {
     host: string;
     port: number;
@@ -44,44 +73,4 @@ export type server = {
     defaultUser?: user;
     token?: string;
 }
-/*
-* 封装的ipc数据类型，原数据存储在electron主进程中，通过接口函数操作原数据
-* */
-export class IPCContainer<T> {
-    private readonly name: string;
-
-    constructor(name: string) {
-        this.name = name;
-    }
-
-    public async get(key: string): Promise<T | null> {
-        return await window['electron'].invoke(this.name, 'get', key)
-    }
-
-    public async set(key: string, value: server): Promise<void> {
-        await window['electron'].invoke(this.name, 'set', key, value);
-    }
-
-    public async delete(key: string): Promise<void> {
-        await window['electron'].invoke(this.name, 'delete', key);
-    }
-
-    public async has(key: string): Promise<boolean> {
-        return await window['electron'].invoke(this.name, 'has', key);
-    }
-
-    public async pop(key: string): Promise<T> {
-        return await window['electron'].invoke(this.name, 'pop', key);
-    }
-
-    public async all(): Promise<Map<string, T>> {
-        const resp: [string, T][] =  await window['electron'].invoke(this.name, 'all');
-        return new Map<string, T>(resp);
-    }
-
-}
-// 全部服务器信息
-export const Services = new IPCContainer<server>('Services');
-// 全部变量
-export const Public = new IPCContainer<any>('Public');
 

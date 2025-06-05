@@ -1,5 +1,5 @@
 <template>
-  <el-container style="height: 100%; margin: 0;">
+  <el-container style="height: 100vh; margin: 0;">
     <el-header height="36px" style="padding: 0 0 0 10px; border-bottom: 1px solid #eee">
       <div class="title-bar">
         <div style="width: 70px; padding-left: 10px; padding-top: 2px;padding-bottom: 3px">
@@ -13,11 +13,11 @@
               <Minus></Minus>
             </el-icon>
           </el-button>
-          <el-button @click="handle('main-max')">
-            <el-icon :size="16">
-              <Crop></Crop>
-            </el-icon>
-          </el-button>
+          <!--          <el-button @click="handle('main-max')">-->
+          <!--            <el-icon :size="16">-->
+          <!--              <Crop></Crop>-->
+          <!--            </el-icon>-->
+          <!--          </el-button>-->
           <el-button @click="handle('main-close')">
             <el-icon :size="16">
               <Close></Close>
@@ -27,18 +27,18 @@
       </div>
     </el-header>
 
-    <el-container>
+    <el-container style="height: 612px">
       <el-aside width="80px" style="border-right: 1px solid #eee">
         <IconButton icon="server" @click="toggleShow(`server`)"></IconButton>
-        <IconButton icon="hall" @click="toggleShow(`hall`)"></IconButton>
-        <IconButton icon="connectGame" @click="toggleShow(`connectGame`)"></IconButton>
+<!--        <IconButton icon="hall" @click="toggleShow(`hall`)"></IconButton>-->
+<!--        <IconButton icon="connectGame" @click="toggleShow(`connectGame`)"></IconButton>-->
         <IconButton icon="setting" @click="toggleShow(`setting`)"></IconButton>
       </el-aside>
-      <el-aside width="200px" style="border-right: 1px solid #eee">
+      <el-aside width="200px" style="border-right: 1px solid #eee" v-if="show !== ''">
         <ServerItems v-if="show === `server`"></ServerItems>
       </el-aside>
-      <el-main style="padding: 0">
-        <router-view></router-view>
+      <el-main style="padding: 0;overflow: hidden;height: 100%">
+        <router-view :key="$route.fullPath"></router-view>
       </el-main>
     </el-container>
   </el-container>
@@ -49,7 +49,7 @@
 import IconButton from "./components/elements/IconButton.vue";
 import {Close, Crop, Minus} from "@element-plus/icons-vue";
 import {ref} from "vue";
-import ServerItems from "./components/elements/ServerItems.vue";
+import ServerItems from "./components/elements/server/ServerItems.vue";
 import {useRouter} from "vue-router";
 import {ipcSend, ipcOn} from "./utils/ipcTypes";
 import {ElMessage} from 'element-plus'
@@ -57,6 +57,7 @@ import {ElMessage} from 'element-plus'
 async function handle(msg: string): Promise<void> {
   await ipcSend(msg);
 }
+
 ipcOn('msg', (msg: string, type: string) => {
   ElMessage({
     showClose: true,
@@ -71,6 +72,8 @@ let show = ref('');
 function toggleShow(target: string) {
   if (show.value === target) {
     router.push('/');
+    show.value = '';
+    return;
   }
   show.value = target;
 }

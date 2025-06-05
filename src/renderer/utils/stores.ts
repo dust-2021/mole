@@ -24,38 +24,30 @@ function createElectronStore<T>(id: string) {
 
         },
         actions: {
-            delete(key: string) {
-                window['electron'].invoke(id, 'delete', key).then(() => {
-                    this.originData.delete(key);
-                })
-
-            },
-            set(key: string, value: T) {
-                window['electron'].invoke(id, 'set', key, value).then(() => {
-                    this.originData.set(key, value);
-                });
-
-            },
-            pop(key: string): T {
-                let svr: T = null;
-                window['electron'].invoke(id, 'pop', key).then((data: T) => {
-                    svr = data;
-                })
+            async delete(key: string) {
+                await window['electron'].invoke(id, 'delete', key);
                 this.originData.delete(key);
-                return svr
+
             },
-            // 同步electron中的原数据
-            init(): void {
+            async set(key: string, value: T) {
+                await window['electron'].invoke(id, 'set', key, value);
+                this.originData.set(key, value);
+            },
+            async pop(key: string): Promise<T> {
+                let svr: T = await window['electron'].invoke(id, 'pop', key)
+                this.originData.delete(key);
+                return svr;
+            },
+            // 同步electron中的原数据，只需要执行一次，后续执行无效
+            async init(): Promise<void> {
                 if (this.initialed) {
                     return
                 }
                 this.initialed = true;
-                window['electron'].invoke(id, 'all').then((data: [string, T][]) => {
-                    for (let item of data) {
-                        this.originData.set(item[0], item[1]);
-                    }
-                });
-
+                const data: [string, T][] = await window['electron'].invoke(id, 'all');
+                for (let item of data) {
+                    this.originData.set(item[0], item[1]);
+                }
             }
         }
     })
@@ -66,3 +58,10 @@ function createElectronStore<T>(id: string) {
 * */
 export const Services = createElectronStore<server>('Services');
 export const Public = createElectronStore<any>('Public');
+
+export async function initStore() {
+    const svr = Services();
+    const pub = Public();
+    await svr.init();
+    await pub.init();
+}

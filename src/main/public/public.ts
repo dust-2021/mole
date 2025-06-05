@@ -7,6 +7,7 @@ import {app, BrowserWindow} from "electron";
 
 const storePath = app.getPath('userData');
 
+// 通用封装map类型，storeKey为持久化文件名，未传递则不保存
 class globals<T> {
     private readonly data = new Map<string, T>();
     private readonly storeKey: string = "";
@@ -95,6 +96,15 @@ export type ipcHttpReq = {
     apiName: string,
     args: any[]
 }
+
+// ipc传递ws请求规范
+export type ipcWsReq = {
+    serverName: string,
+    uuid: string,
+    apiName: string,
+    args: any[]
+}
+
 // ws发送信息格式 和服务器对应
 export type wsReqBody = {
     method: string;
@@ -105,6 +115,7 @@ export type wsReqBody = {
 // ws接收信息格式 和服务器对应
 export type wsRespBody = {
     id: string;
+    method: string;
     statusCode: number;
     data: any;
 };
@@ -122,8 +133,12 @@ export type server = {
     token?: string;
 }
 
-export type httpHandler = (svr: server, ...args: any) => Promise<HttpResp>
-export type wsHandler = (r: wsRespBody) => Promise<any>;
+// http请求处理函数类型，等待结果返回并处理
+export type httpHandler = (svr: server, ...args: any) => Promise<HttpResp>;
+// ws请求发送函数类型，不等待请求结果
+export type wsSender = (r: wsReqBody) => Promise<void>;
+// 监听并处理ws请求
+export type wsListener = (r: wsRespBody) => Promise<void>;
 
 // 全局变量
 export const Public = new globals<any>('Public');
@@ -131,8 +146,10 @@ export const Public = new globals<any>('Public');
 export const Configs = new globals<any>('Configs');
 // 服务器接口
 export const Api = new globals<httpHandler>();
-
-export const WsApi = new globals<wsHandler>();
+// ipc可调用ws接口
+export const WsApi = new globals<wsSender>();
+// ws监听处理函数
+export const WsHandler = new globals<wsListener>();
 // 服务器
 export const Services = new globals<server>('Services');
 // 渲染窗口

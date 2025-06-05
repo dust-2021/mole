@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import {ref, onBeforeMount, watch} from "vue";
-import {HttpResp, HttpReq, request, Services, server} from '../../utils/ipcTypes'
-import RoomList from "../elements/RoomList.vue";
+import {ref, onBeforeMount} from "vue";
+import {server} from '../../utils/ipcTypes'
+import {Services} from "../../utils/stores";
+import RoomList from "../elements/room/RoomList.vue";
+import ServerConfig from "../elements/server/ServerConfig.vue";
 
 const props = defineProps({
   name: {
@@ -10,44 +12,24 @@ const props = defineProps({
   }
 })
 let isMounted = ref(false);
-let status = ref(true);
-let ping = ref(0);
 let svr = ref<server>(null);
-
-async function checkHost(): Promise<void> {
-  const req: HttpReq = {serverName: props.name, apiName: 'serverTime'};
-  const resp: HttpResp = await request(req);
-  status.value = resp.success && resp.statusCode === 0;
-  ping.value = status.value ? Date.now() - resp.data : 0;
-}
+const services = Services();
 
 onBeforeMount(async () => {
-  await checkHost();
-  svr.value = await Services.get(props.name);
+  svr.value = services.get(props.name);
   isMounted.value = true;
 });
-
-watch(() => props.name, (val) => {
-  checkHost();
-})
 
 </script>
 
 <template>
   <div style="height: 100%" v-if="isMounted">
-    <el-empty :description="`无法连接到服务器`" v-if="!status"></el-empty>
-    <el-tabs style="height: 100%; padding: 0 2%" v-else>
+    <el-tabs style="height: 100%; padding: 0 2%">
       <el-tab-pane label="首页">
-    <RoomList :server-name="props.name"></RoomList>
-      </el-tab-pane>
-      <el-tab-pane label="信息">
-        <el-descriptions title="服务器" :column="3" border>
-          <el-descriptions-item label="名称：">{{ name }}</el-descriptions-item>
-          <el-descriptions-item label="地址：">{{ svr.host }}</el-descriptions-item>
-        </el-descriptions>
+        <RoomList :server-name="props.name"></RoomList>
       </el-tab-pane>
       <el-tab-pane label="设置">
-
+        <ServerConfig :server-name="props.name"></ServerConfig>
       </el-tab-pane>
     </el-tabs>
 
