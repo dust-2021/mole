@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import {ref, onBeforeMount} from 'vue'
+import {ref, onBeforeMount, onBeforeUnmount} from 'vue'
 import {Services} from "../../../utils/stores";
-import {server, ipcWsReq} from "../../../utils/ipcTypes";
+import {server, ipcWsReq, ipcOnce, wsRequest, wsResp, ipcOn, ipcRemove} from "../../../utils/ipcTypes";
 import {useRouter} from "vue-router";
+import {ElMessage} from "element-plus";
+import {ArrowLeft, Lock, Unlock } from '@element-plus/icons-vue'
 
 const props = defineProps({
   serverName: {
@@ -32,20 +34,21 @@ const mounted = ref(false);
 const services = Services();
 const svr = ref<server>(null);
 const messages = ref<message[]>(null);
-const members = ref<Map<number, member>>(null);
+const members = ref<Map<number, member>>(new Map());
 const self = ref<member>(null);
 const inputMessage = ref<string>('');
 const router = useRouter();
 
-function onMessage(msg: string, from: number) {
-  messages.value.push({from: from, text: msg, timestamp: Date.now()});
+function onMessage(resp: wsResp) {
+  const data: {senderId: number, senderName: string, data: string, timestamp: number} = resp.data;
+  messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
 }
 
 async function sendMessage(): Promise<void> {
   if (inputMessage.value === "") {
     return;
   }
-  // await window['electron'].invoke('')
+  await wsRequest({serverName: props.serverName, apiName: 'room.message', args: [props.serverName, props.roomId]})
   messages.value.push({
     from: self.value.userId,
     text: inputMessage.value,
@@ -54,33 +57,61 @@ async function sendMessage(): Promise<void> {
   inputMessage.value = "";
 }
 
-function onJoinRoom(userId: number) {
-
+function onJoinRoom(resp: wsResp) {
+  const data: {id: number, name: string, owner: boolean, addr: string} = resp.data;
+  members.value.set(data.id, {
+    userId: data.id, username: data.name, addr: data.addr, owner: data.owner
+  });
 }
 
-function onLeaveRoom(userId: number) {
-
+function onLeaveRoom(resp: wsResp) {
+  const id: number = resp.data;
+  members.value.delete(id);
 }
 
-function onOwnerChange(userId: number) {
-
+function onOwnerChange(resp: wsResp) {
+  const data: {old: number, new: number} = resp.data;
+  const old = {...members.value.get(data.old), owner: false};
+  const new_ = {...members.value.get(data.new), owner: false};
+  members.value.set(data.old, old);
+  members.value.set(data.new, new_);
 }
 
 function onCloseRoom() {
-  router.push('/')
+  router.push('/server/' + props.serverName)
 }
 
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
   svr.value = services.get(props.serverName);
+  await wsRequest({serverName: props.serverName, apiName: 'room.roommate', args: [props.roomId]},
+      true, 2000, (resp: wsResp) => {
+      if (resp.statusCode !== 0) {
+        ElMessage({
+          showClose: true,
+          message: `获取成员失败：${resp.statusCode}-${resp.data}`,
+          type: 'warning'
+        })
+        return
+      }
+        for (const item of resp.data) {
+          members.value.set(item.id, {
+            userId: item.id,
+            username: item.name,
+            addr: item.addr,
+            owner: item.owner
+          })
+        }
+      });
+  ipcOn(`${props.serverName}.room.in.${props.roomId}`, onJoinRoom)
+  ipcOn(`${props.serverName}.room.owner.${props.roomId}`, onOwnerChange)
+  ipcOn(`${props.serverName}.room.out.${props.roomId}`, onLeaveRoom)
+  ipcOn(`${props.serverName}.room.message.${props.roomId}`, onMessage)
+  ipcOnce(`${props.serverName}.room.close.${props.roomId}`, onCloseRoom)
+
+
   mounted.value = true;
   messages.value = [];
-  members.value = new Map([[1, {userId: 1, username: "mole", addr: "", owner: true}], [2, {
-    userId: 2,
-    username: "root",
-    addr: "",
-    owner: false
-  }]]);
   for (const m of members.value) {
     if (m[1].username === svr.value.defaultUser.username) {
       self.value = {
@@ -93,13 +124,31 @@ onBeforeMount(() => {
   }
 
 })
+onBeforeUnmount(async () => {
+  await wsRequest({serverName: props.serverName, apiName: 'room.out', args: [props.roomId]});
+
+  ipcRemove(`${props.serverName}.room.in.${props.roomId}`, onJoinRoom)
+  ipcRemove(`${props.serverName}.room.owner.${props.roomId}`, onOwnerChange)
+  ipcRemove(`${props.serverName}.room.out.${props.roomId}`, onLeaveRoom)
+  ipcRemove(`${props.serverName}.room.message.${props.roomId}`, onMessage)
+})
 </script>
 
 <template>
   <div style="height: 100%;width: 100%">
     <el-row :gutter="24" v-if="mounted" style="height: 100%;width: 100%">
       <el-col :span="6" style="height: 100%">
-        <el-scrollbar :always="false" style="border-right: 1px solid #eee;" height="100%" max-height="100%" :noresize="true">
+        <div>
+          <el-row :gutter="24">
+            <el-col :span="8"><el-icon><ArrowLeft></ArrowLeft></el-icon></el-col>
+            <el-col :span="8"></el-col>
+            <el-col :span="8"></el-col>
+          </el-row>
+        </div>
+        <div style="width: 100%;" v-if="mounted">
+        </div>
+        <el-scrollbar :always="false" style="border-right: 1px solid #eee;" height="100%" max-height="100%"
+                      :noresize="true">
           <div v-for="(k, i) in members" :key="i" class="member-info">
             <el-row :gutter="24">
               <el-col :span="6">
@@ -107,8 +156,12 @@ onBeforeMount(() => {
               </el-col>
               <el-col :span="14">
                 <el-row :gutter="24">
-                  <el-col :span="16"><el-text :type="'primary'">{{ k[1].username }}</el-text></el-col>
-                  <el-col :span="8"><el-tag v-if="k[1].owner" size="small">房主</el-tag></el-col>
+                  <el-col :span="16">
+                    <el-text :type="'primary'">{{ k[1].username }}</el-text>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-tag v-if="k[1].owner" size="small">房主</el-tag>
+                  </el-col>
                 </el-row>
               </el-col>
             </el-row>

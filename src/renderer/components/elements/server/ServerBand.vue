@@ -2,7 +2,7 @@
 
 import {Connection, Loading} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {request, server} from "../../../utils/ipcTypes";
+import {ipcOn, ipcRemove, request, server} from "../../../utils/ipcTypes";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
 
@@ -20,24 +20,28 @@ const props = defineProps({
 
 // 0 未连接 1 连接中 2 已连接
 const connected = ref<number>(0);
+const ping = ref<number>(0);
+const handler = async (time: number) => {
+  ping.value = Date.now() - time;
+}
 
+// 开启或关闭ws连接
 async function activeCon(serverName: string) {
-  connected.value = 1;
-  let flag: boolean;
   if (connected.value === 2) {
-    flag = await window['electron'].invoke("wsClose", serverName);
+    await window['electron'].invoke("wsClose", serverName);
     connected.value = 0;
   } else {
-    flag = await window['electron'].invoke("wsActive", serverName);
-    connected.value = flag === true ? 2 : 0;
+    connected.value = 1;
+    await window['electron'].invoke("wsActive", serverName);
+    connected.value = 2;
   }
-  if (!flag) {
-    ElMessage({
-      type: "warning",
-      message: "连接异常",
-      showClose: true,
-    })
-  }
+  // if (!flag) {
+  //   ElMessage({
+  //     type: "warning",
+  //     message: "连接异常",
+  //     showClose: true,
+  //   })
+  // }
 }
 
 async function login(s: server, logout: boolean = false): Promise<void> {
@@ -56,9 +60,11 @@ async function login(s: server, logout: boolean = false): Promise<void> {
 
 onBeforeMount(() => {
   login(props.curServer)
+  ipcOn(`ping-${props.serverName}`, handler)
 });
 
 onBeforeUnmount(() => {
+  ipcRemove(`ping-${props.serverName}`, handler)
   if (connected.value === 2) {
     activeCon(props.serverName)
   }
@@ -75,14 +81,17 @@ onBeforeUnmount(() => {
       </el-button>
     </el-col>
     <el-col :span="8">
-      <el-button :color="connected ? `blue`: `lightgray`"
-                 style="border: 0" @click="activeCon(serverName)" v-if="curServer.defaultUser" :disabled="connected === 1">
-        <el-icon :size="16" v-if="connected !== 1">
+      <el-button :class="{'connected-box': connected === 2, 'disconnected-box': connected !== 2}"
+                  @click="activeCon(serverName)" v-if="curServer.defaultUser" :disabled="connected === 1"
+                 style="width: 80%"
+      >
+        <el-icon :size="16" v-if="connected === 0">
           <Connection></Connection>
         </el-icon>
-        <el-icon :size="16" class="is-loading" v-else>
+        <el-icon :size="16" class="is-loading" v-else-if="connected === 1">
           <Loading></Loading>
         </el-icon>
+        <el-text :type="ping > 100 ? 'warning': 'info'" :truncated="true" v-else>{{ping}}</el-text>
       </el-button>
     </el-col>
   </el-row>
@@ -99,5 +108,13 @@ onBeforeUnmount(() => {
 
 .hover-box:hover {
   background-color: #eee;
+}
+.connected-box {
+  border-color: lightgreen;
+  background-color: white;
+}
+.disconnected-box {
+  border: 0;
+  background-color: lightgray;
 }
 </style>

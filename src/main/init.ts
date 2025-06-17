@@ -2,15 +2,16 @@ import {Configs, Public, Services} from './public/public';
 import {Connection} from './ws/connection'
 import {registerApis as userApi} from './api/user';
 import {registerApis as systemApi} from './api/server';
+import {registerApis as roomApi} from './api/room'
 import path from 'path';
 import {ipcMain} from "electron";
 import {request, wsRequest} from "./app/channel";
 import os from 'os';
-import {WebSocket} from "ws";
 
 function initialApi() {
     userApi();
     systemApi();
+    roomApi();
 }
 
 // 注册主进程和渲染进程通信接口
@@ -29,7 +30,6 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("wsActive", (Event, serverName: string) => {
         const conn = Connection.getInstance(serverName);
         conn.active();
-        return conn.conn?.readyState === WebSocket.OPEN;
     })
     ipc.handle("wsClose", (Event, serverName: string) => {
         if (!Connection.All.has(serverName)) {
@@ -37,7 +37,6 @@ export function initialIPC(ipc: typeof ipcMain) {
         }
         const conn = Connection.getInstance(serverName);
         conn.close();
-        return conn.conn?.readyState === WebSocket.CLOSED || conn.conn?.readyState === WebSocket.CLOSING;
     })
 }
 

@@ -16,7 +16,7 @@ const routes = [
         props: true,
     },
     {
-        path: "/room/:serverName/:id",
+        path: "/room/:serverName/:roomId",
         component: Room,
         props: true,
     }

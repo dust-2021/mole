@@ -138,7 +138,7 @@ export type httpHandler = (svr: server, ...args: any) => Promise<HttpResp>;
 // ws请求发送函数类型，不等待请求结果
 export type wsSender = (r: wsReqBody) => Promise<void>;
 // 监听并处理ws请求
-export type wsListener = (r: wsRespBody) => Promise<void>;
+export type wsListener = (serverName: string, r: wsRespBody) => Promise<void>;
 
 // 全局变量
 export const Public = new globals<any>('Public');

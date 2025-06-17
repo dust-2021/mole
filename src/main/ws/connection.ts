@@ -62,17 +62,20 @@ export class Connection {
             data = event.data;
         }
         if (data === 'ping') {
+            Logger.info(`ping from ${this.serverName}`);
             this.conn.send('pong');
             return;
         }
         const r: wsRespBody = JSON.parse(data);
         try {
-            if (WsHandler.has(r.id)) {
-                const f = WsHandler.get(r.id);
-                f?.(r);
+            // 响应服务器消息
+            if (WsHandler.has(r.method)) {
+                const f = WsHandler.get(r.method);
+                f?.(this.serverName, r);
+
             } else if (this.singleHandleMap.has(r.id)) {
                 const f = this.singleHandleMap.get(r.id);
-                f?.(r);
+                f?.(this.serverName, r);
             } else {
                 // 未找到相应处理函数直接发送到渲染进程
                 const win = Windows.get("main");

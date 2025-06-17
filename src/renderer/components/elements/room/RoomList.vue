@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import {onBeforeMount, ref, computed} from "vue";
-import {ipcOn, ipcOnce, request, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
+import {request, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
 import {Connection, Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
 import {ElMessage, ElMessageBox} from "element-plus";
-import {v4 as uuid} from 'uuid';
 import {useRouter} from 'vue-router';
 
 const props = defineProps(
@@ -75,22 +74,26 @@ function inputPassword(roomId: string): void {
     confirmButtonText: "OK", cancelButtonText: "取消",
     inputPattern: /\w{2,12}/,
     inputErrorMessage: "格式错误"
-  }).then(({value}) => {
-    const key = uuid().toString();
-    wsRequest({serverName: props.serverName, apiName: "room.in", uuid: key, args: [roomId, value]});
-    const handle = setTimeout(()=> {}, 2000);
-    ipcOnce(key, (resp: wsResp) => {
-      clearTimeout(handle);
-      if (resp.statusCode !== 0) {
-        ElMessage({
-          showClose: true,
-          message: "连接房间失败",
-          type: "warning",
-        } as any)
-        return
-      }
-      router.push(`/room/${props.serverName}/${roomId}`)
-    })
+  }).then(async ({value}) => {
+    await wsRequest({serverName: props.serverName, apiName: "room.in", args: [roomId, value]},
+        true, 2000, (resp: wsResp) => {
+          if (resp.statusCode !== 0) {
+            ElMessage({
+              showClose: true,
+              message: `连接失败：${resp.statusCode}-${resp.data}`,
+              type: "warning",
+            } as any)
+            return
+          }
+          router.push(`/room/${props.serverName}/${roomId}`)
+        },
+        () => {
+          ElMessage({
+            showClose: true,
+            message: "请求超时",
+            type: "warning",
+          } as any)
+        })
   })
 }
 
@@ -98,62 +101,64 @@ function inputPassword(roomId: string): void {
 
 <template>
   <div style="height: 90%">
-  <el-table :data="filterRooms" style="width: 100%" v-if="mounted" :empty-text="svr.token?`未找到房间`: `未登录`">
-    <el-table-column prop="roomTitle" label="标题" width="100" show-overflow-tooltip></el-table-column>
-    <el-table-column prop="description" label="房间描述" show-overflow-tooltip></el-table-column>
-    <el-table-column prop="ownerName" label="创建人" width="100" show-overflow-tooltip></el-table-column>
-    <el-table-column label="成员" width="80">
-      <template #default="scope">
-        <el-tag :type="scope.row.memberCount < scope.row.memberMax?'primary': 'danger'" size="small">
-          {{ `${scope.row.memberCount}/${scope.row.memberMax}` }}
-        </el-tag>
-      </template>
-    </el-table-column>
-    <el-table-column label="" width="100">
-      <template #default="scope">
-        <el-row :gutter="24">
-          <el-col :span="12">
-            <el-icon>
-              <Lock v-if="scope.row.withPassword"></Lock>
-              <Unlock v-else></Unlock>
-            </el-icon>
-          </el-col>
-          <el-col :span="12">
-            <el-icon>
-              <CircleCloseFilled v-if="scope.row.withPassword"></CircleCloseFilled>
-            </el-icon>
-          </el-col>
-        </el-row>
-
-      </template>
-    </el-table-column>
-    <el-table-column align="right" width="180">
-      <template #header>
-        <el-row :gutter="24">
-          <el-col :span="6">
-            <el-button @click="getRoomInfo" size="small">
+    <el-table :data="filterRooms" style="width: 100%" v-if="mounted" :empty-text="svr.token?`未找到房间`: `未登录`">
+      <el-table-column prop="roomTitle" label="标题" width="100" show-overflow-tooltip></el-table-column>
+      <el-table-column prop="description" label="房间描述" show-overflow-tooltip></el-table-column>
+      <el-table-column prop="ownerName" label="创建人" width="100" show-overflow-tooltip></el-table-column>
+      <el-table-column label="成员" width="80">
+        <template #default="scope">
+          <el-tag :type="scope.row.memberCount < scope.row.memberMax?'primary': 'danger'" size="small">
+            {{ `${scope.row.memberCount}/${scope.row.memberMax}` }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="" width="100">
+        <template #default="scope">
+          <el-row :gutter="24">
+            <el-col :span="12">
               <el-icon>
-                <Refresh></Refresh>
+                <Lock v-if="scope.row.withPassword"></Lock>
+                <Unlock v-else></Unlock>
               </el-icon>
-            </el-button>
-          </el-col>
-          <el-col :span="18">
-            <el-input v-model="searchWords" placeholder="查找" size="small"></el-input>
-          </el-col>
-        </el-row>
-      </template>
-      <template #default="scope">
-        <el-button size="small" :disabled="scope.row.forbidden || scope.row.memberCount === scope.row.memberMax" @click="inputPassword(scope.row.roomId)">
-          <el-icon>
-            <Connection></Connection>
-          </el-icon>
-          <span style="text-align: center">
+            </el-col>
+            <el-col :span="12">
+              <el-icon>
+                <CircleCloseFilled v-if="scope.row.withPassword"></CircleCloseFilled>
+              </el-icon>
+            </el-col>
+          </el-row>
+
+        </template>
+      </el-table-column>
+      <el-table-column align="right" width="180">
+        <template #header>
+          <el-row :gutter="24">
+            <el-col :span="6">
+              <el-button @click="getRoomInfo" size="small">
+                <el-icon>
+                  <Refresh></Refresh>
+                </el-icon>
+              </el-button>
+            </el-col>
+            <el-col :span="18">
+              <el-input v-model="searchWords" placeholder="查找" size="small"></el-input>
+            </el-col>
+          </el-row>
+        </template>
+        <template #default="scope">
+          <el-button size="small" :disabled="scope.row.forbidden || scope.row.memberCount === scope.row.memberMax"
+                     @click="inputPassword(scope.row.roomId)">
+            <el-icon>
+              <Connection></Connection>
+            </el-icon>
+            <span style="text-align: center">
             加入
           </span>
-        </el-button>
-      </template>
-    </el-table-column>
-  </el-table></div>
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+  </div>
   <el-footer height="10%">
     <el-pagination :size="'small'" background layout="prev, pager, next" :total="info.total"></el-pagination>
   </el-footer>
