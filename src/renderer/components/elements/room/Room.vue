@@ -4,7 +4,9 @@ import {Services} from "../../../utils/stores";
 import {server, ipcWsReq, ipcOnce, wsRequest, wsResp, ipcOn, ipcRemove} from "../../../utils/ipcTypes";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import {ArrowLeft, Lock, Unlock } from '@element-plus/icons-vue'
+import Message from "./Message.vue";
+import {ArrowLeft, Lock, Unlock, CopyDocument } from '@element-plus/icons-vue'
+import SystemMessage from "./SystemMessage.vue";
 
 const props = defineProps({
   serverName: {
@@ -38,17 +40,27 @@ const members = ref<Map<number, member>>(new Map());
 const self = ref<member>(null);
 const inputMessage = ref<string>('');
 const router = useRouter();
+const forbidden = ref(false);
 
 function onMessage(resp: wsResp) {
   const data: {senderId: number, senderName: string, data: string, timestamp: number} = resp.data;
   messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
 }
 
+function copyRoomId(msg: string) {
+  navigator.clipboard.writeText(msg).then(async () => {
+    ElMessage({
+      message: '已复制房间ID',
+      type: 'success'
+    })
+  })
+}
+
 async function sendMessage(): Promise<void> {
   if (inputMessage.value === "") {
     return;
   }
-  await wsRequest({serverName: props.serverName, apiName: 'room.message', args: [props.serverName, props.roomId]})
+  await wsRequest({serverName: props.serverName, apiName: 'room.message', args: [props.roomId, inputMessage.value]})
   messages.value.push({
     from: self.value.userId,
     text: inputMessage.value,
@@ -62,10 +74,12 @@ function onJoinRoom(resp: wsResp) {
   members.value.set(data.id, {
     userId: data.id, username: data.name, addr: data.addr, owner: data.owner
   });
+  messages.value.push({from: 0, text: `${data.name}加入房间`, timestamp: Date.now()});
 }
 
 function onLeaveRoom(resp: wsResp) {
   const id: number = resp.data;
+  messages.value.push({from: 0, text: `${members.value.get(id)?.username}离开房间`, timestamp: Date.now()});
   members.value.delete(id);
 }
 
@@ -73,12 +87,29 @@ function onOwnerChange(resp: wsResp) {
   const data: {old: number, new: number} = resp.data;
   const old = {...members.value.get(data.old), owner: false};
   const new_ = {...members.value.get(data.new), owner: false};
+  messages.value.push({from: 0, text: `房主已移交至${new_.username}`, timestamp: Date.now()});
   members.value.set(data.old, old);
   members.value.set(data.new, new_);
 }
 
 function onCloseRoom() {
   router.push('/server/' + props.serverName)
+}
+
+async function forbiddenRoom(){
+  if (!self.value.owner){
+    ElMessage({
+      message: '仅房主可用',
+      type: 'warning'
+    })
+    return;
+  }
+  await wsRequest({serverName: props.serverName, apiName: 'room.forbidden', args: [props.roomId]},
+  true, 2000, (resp: wsResp) => {
+    if (resp.statusCode === 0) {
+      forbidden.value = !forbidden.value;
+    }
+      })
 }
 
 
@@ -95,6 +126,12 @@ onBeforeMount(async () => {
         return
       }
         for (const item of resp.data) {
+          // 获取自己的账号信息
+          if (item.name === svr.value.defaultUser.username){
+            self.value = {
+              userId: item.id, username: item.name, addr: item.addr, owner: item.owner
+            }
+          }
           members.value.set(item.id, {
             userId: item.id,
             username: item.name,
@@ -112,18 +149,8 @@ onBeforeMount(async () => {
 
   mounted.value = true;
   messages.value = [];
-  for (const m of members.value) {
-    if (m[1].username === svr.value.defaultUser.username) {
-      self.value = {
-        userId: m[1].userId,
-        username: m[1].username,
-        addr: m[1].addr,
-        owner: m[1].owner,
-      }
-    }
-  }
-
 })
+
 onBeforeUnmount(async () => {
   await wsRequest({serverName: props.serverName, apiName: 'room.out', args: [props.roomId]});
 
@@ -137,17 +164,17 @@ onBeforeUnmount(async () => {
 <template>
   <div style="height: 100%;width: 100%">
     <el-row :gutter="24" v-if="mounted" style="height: 100%;width: 100%">
-      <el-col :span="6" style="height: 100%">
+      <el-col :span="6" style="height: 100%;border-right: 1px solid #eee;">
         <div>
-          <el-row :gutter="24">
-            <el-col :span="8"><el-icon><ArrowLeft></ArrowLeft></el-icon></el-col>
-            <el-col :span="8"></el-col>
-            <el-col :span="8"></el-col>
+          <el-row :gutter="24" class="room-band">
+            <el-col :span="8" class="room-btn"><el-icon :size="24" @click="$router.back()"><ArrowLeft></ArrowLeft></el-icon></el-col>
+            <el-col :span="8" class="room-btn"><el-icon :size="24" @click="forbiddenRoom"><Lock v-if="forbidden"></Lock><Unlock v-else></Unlock></el-icon></el-col>
+            <el-col :span="8" class="room-btn"><el-icon @click="copyRoomId(props.roomId)" :size="24"><CopyDocument></CopyDocument></el-icon></el-col>
           </el-row>
         </div>
         <div style="width: 100%;" v-if="mounted">
         </div>
-        <el-scrollbar :always="false" style="border-right: 1px solid #eee;" height="100%" max-height="100%"
+        <el-scrollbar :always="false" height="100%" max-height="100%"
                       :noresize="true">
           <div v-for="(k, i) in members" :key="i" class="member-info">
             <el-row :gutter="24">
@@ -171,26 +198,10 @@ onBeforeUnmount(async () => {
       <el-col :span="18" style="height: 100%;">
         <div style="height: 70%;display: flex; flex-direction: column">
           <el-scrollbar :always="false" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 2px">
-            <div
-                v-for="(message, index) in messages"
-                :key="index"
-                class="message-item"
-                :class="{ 'self-message': message.from === self?.userId }"
-            >
-              <div class="message-avatar">
-                <el-avatar :size="40" src=""/>
-              </div>
-              <div class="message-content">
-                <div class="message-info">
-                  <span class="sender-name" v-if="message.from !== self.userId">{{
-                      members.get(message.from)?.username
-                    }}</span>
-                  <span class="send-time">{{ (new Date(message.timestamp)).toLocaleTimeString() }}</span>
-                </div>
-                <div class="message-bubble">
-                  <div class="message-text">{{ message.text }}</div>
-                </div>
-              </div>
+            <div v-for="(message, index) in messages">
+              <Message :msg="message.text" :time="message.timestamp" :self="message.from === self.userId"
+                       :username="members.get(message.from)?.username" v-if="message.from !== 0"></Message>
+              <SystemMessage :message="message.text" :time="message.timestamp" v-else></SystemMessage>
             </div>
           </el-scrollbar>
         </div>
@@ -221,63 +232,12 @@ onBeforeUnmount(async () => {
   border-bottom: 1px solid #eeeeee;
   align-items: center;
 }
-
-.message-item {
-  display: flex;
-  margin-bottom: 15px;
+.room-band {
+  background: #eeeeee;
 }
-
-.message-item.self-message {
-  flex-direction: row-reverse;
-}
-
-.message-avatar {
-  margin-right: 10px;
-}
-
-.self-message .message-avatar {
-  margin-right: 0;
-  margin-left: 10px;
-}
-
-.message-content {
-  max-width: 60%;
-}
-
-.message-info {
-  margin-bottom: 5px;
-  font-size: 12px;
-  color: #666;
-}
-
-.self-message .message-info {
-  text-align: right;
-}
-
-.sender-name {
-  margin-right: 8px;
-  font-weight: bold;
-}
-
-.send-time {
-  color: #999;
-}
-
-.message-bubble {
-  position: relative;
-  padding: 10px 15px;
-  border-radius: 4px;
+.room-btn {
+  padding: 5px 2px;
+  border-radius: 3px;
   background-color: white;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.self-message .message-bubble {
-  background-color: #95ec69;
-}
-
-.message-text {
-  word-break: break-word;
-  font-size: 14px;
-  line-height: 1.5;
 }
 </style>

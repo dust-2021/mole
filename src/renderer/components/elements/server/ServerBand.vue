@@ -2,7 +2,7 @@
 
 import {Connection, Loading} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {ipcOn, ipcRemove, request, server} from "../../../utils/ipcTypes";
+import {ipcOn, ipcRemove, request, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
 
@@ -21,19 +21,19 @@ const props = defineProps({
 // 0 未连接 1 连接中 2 已连接
 const connected = ref<number>(0);
 const ping = ref<number>(0);
-const handler = async (time: number) => {
-  ping.value = Date.now() - time;
-}
+let pingTaskId: NodeJS.Timeout = null;
 
 // 开启或关闭ws连接
 async function activeCon(serverName: string) {
   if (connected.value === 2) {
+    clearInterval(pingTaskId);
     await window['electron'].invoke("wsClose", serverName);
     connected.value = 0;
   } else {
     connected.value = 1;
     await window['electron'].invoke("wsActive", serverName);
     connected.value = 2;
+    pingTaskId = setInterval(pingTask, 1000)
   }
   // if (!flag) {
   //   ElMessage({
@@ -48,6 +48,7 @@ async function login(s: server, logout: boolean = false): Promise<void> {
   if (!s.defaultUser) {
     return
   }
+
   const resp = await request({
     apiName: logout ? 'logout' : 'login',
     serverName: props.serverName,
@@ -57,14 +58,27 @@ async function login(s: server, logout: boolean = false): Promise<void> {
     s.token = resp.data;
   }
 }
+function pingTask() {
+  wsRequest({serverName: props.serverName, apiName: 'base.time', args: []}, true, 2000, (resp: wsResp) => {
+    let data: number;
+    if (resp.statusCode != 0) {
+      ElMessage({
+        type: 'warning',
+        message: '校对服务器时间失败'
+      })
+      return
+    }
+    data = resp.data;
+    ping.value = Date.now() - data;
+  })
+}
 
 onBeforeMount(() => {
   login(props.curServer)
-  ipcOn(`ping-${props.serverName}`, handler)
+
 });
 
 onBeforeUnmount(() => {
-  ipcRemove(`ping-${props.serverName}`, handler)
   if (connected.value === 2) {
     activeCon(props.serverName)
   }

@@ -2,6 +2,7 @@ import {createRouter, createWebHashHistory} from "vue-router";
 import ServerPage from "../components/views/ServerPage.vue";
 import ServerConfig from "../components/elements/server/ServerConfig.vue";
 import Room from "../components/elements/room/Room.vue";
+import RoomCreator from "../components/elements/room/RoomCreator.vue";
 
 const routes = [
     {
@@ -16,8 +17,13 @@ const routes = [
         props: true,
     },
     {
-        path: "/room/:serverName/:roomId",
+        path: "/room/page/:serverName/:roomId",
         component: Room,
+        props: true,
+    },
+    {
+        path: "/room/create/:serverName",
+        component: RoomCreator,
         props: true,
     }
 ];

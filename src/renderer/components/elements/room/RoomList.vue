@@ -72,7 +72,7 @@ onBeforeMount(() => {
 function inputPassword(roomId: string): void {
   ElMessageBox.prompt("输入房间密码", "", {
     confirmButtonText: "OK", cancelButtonText: "取消",
-    inputPattern: /\w{2,12}/,
+    inputPattern: /\w+/,
     inputErrorMessage: "格式错误"
   }).then(async ({value}) => {
     await wsRequest({serverName: props.serverName, apiName: "room.in", args: [roomId, value]},
@@ -80,12 +80,12 @@ function inputPassword(roomId: string): void {
           if (resp.statusCode !== 0) {
             ElMessage({
               showClose: true,
-              message: `连接失败：${resp.statusCode}-${resp.data}`,
+              message: `连接房间失败：${resp.statusCode}-${resp.data}`,
               type: "warning",
             } as any)
             return
           }
-          router.push(`/room/${props.serverName}/${roomId}`)
+          router.push(`/room/page/${props.serverName}/${roomId}`)
         },
         () => {
           ElMessage({
@@ -123,7 +123,7 @@ function inputPassword(roomId: string): void {
             </el-col>
             <el-col :span="12">
               <el-icon>
-                <CircleCloseFilled v-if="scope.row.withPassword"></CircleCloseFilled>
+                <CircleCloseFilled v-if="scope.row.forbidden"></CircleCloseFilled>
               </el-icon>
             </el-col>
           </el-row>
@@ -159,8 +159,13 @@ function inputPassword(roomId: string): void {
       </el-table-column>
     </el-table>
   </div>
-  <el-footer height="10%">
-    <el-pagination :size="'small'" background layout="prev, pager, next" :total="info.total"></el-pagination>
+  <el-footer height="10%" style="justify-items: right">
+    <el-row :gutter="24">
+      <el-col :span="4"><el-button @click="$router.push('/room/create')">创建</el-button></el-col>
+      <el-col :span="20"><el-pagination :size="'small'" background layout="prev, pager, next" :total="info.total"
+      ></el-pagination></el-col>
+    </el-row>
+
   </el-footer>
 </template>
 

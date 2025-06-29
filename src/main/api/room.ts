@@ -29,6 +29,6 @@ export function registerApis() {
     WsHandler.set('publish.room.in', roomIn);
     WsHandler.set('publish.room.out', roomOut);
     WsHandler.set('publish.room.close', roomClose);
-    WsHandler.set('publish.room.owner', roomOwner);
+    WsHandler.set('publish.room.exchangeOwner', roomOwner);
     WsHandler.set('publish.room.message', roomMessage);
 }

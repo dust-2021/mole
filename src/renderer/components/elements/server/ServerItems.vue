@@ -2,9 +2,15 @@
 import {useRouter} from "vue-router";
 import {Services} from '../../../utils/stores'
 import ServerBand from "../server/ServerBand.vue";
+import {Plus, ArrowLeft} from '@element-plus/icons-vue'
 
 const svr = Services();
 const router = useRouter();
+const props = defineProps({
+  hideMiddle: {
+    type: Function,
+  }
+})
 
 
 async function newServer(): Promise<void> {
@@ -15,10 +21,16 @@ async function newServer(): Promise<void> {
 <template>
   <div style="height: 100%">
     <div style="height: 10%; border-bottom: 1px #eee solid;">
-      <el-button type="primary" @click="newServer">
-        新建
-      </el-button>
-      <el-button @click="router.push('/room/default/111')">test2</el-button>
+      <el-row :gutter="24">
+        <el-col :span="8">
+          <el-button  @click="newServer">
+            <el-icon><Plus></Plus></el-icon>
+          </el-button>
+        </el-col>
+        <el-col :span="8">
+          <el-button @click="props.hideMiddle"><el-icon><ArrowLeft></ArrowLeft></el-icon></el-button>
+        </el-col>
+      </el-row>
     </div>
 
     <div style="height: 85%">

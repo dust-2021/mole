@@ -25,7 +25,7 @@ onBeforeMount(async () => {
 <template>
   <div style="height: 100%" v-if="isMounted">
     <el-tabs style="height: 100%; padding: 0 2%">
-      <el-tab-pane label="首页">
+      <el-tab-pane label="首页" style="height: 100%">
         <RoomList :server-name="props.name"></RoomList>
       </el-tab-pane>
       <el-tab-pane label="设置">

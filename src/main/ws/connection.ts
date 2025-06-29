@@ -62,7 +62,7 @@ export class Connection {
             data = event.data;
         }
         if (data === 'ping') {
-            Logger.info(`ping from ${this.serverName}`);
+            Logger.debug(`ping from ${this.serverName}`);
             this.conn.send('pong');
             return;
         }

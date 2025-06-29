@@ -34,8 +34,8 @@
 <!--        <IconButton icon="connectGame" @click="toggleShow(`connectGame`)"></IconButton>-->
         <IconButton icon="setting" @click="toggleShow(`setting`)"></IconButton>
       </el-aside>
-      <el-aside width="200px" style="border-right: 1px solid #eee" v-if="show !== ''">
-        <ServerItems v-if="show === `server`"></ServerItems>
+      <el-aside width="200px" style="border-right: 1px solid #eee" v-show="show !== ''">
+        <ServerItems v-show="show === `server`" :hideMiddle="hideMiddle"></ServerItems>
       </el-aside>
       <el-main style="padding: 0;overflow: hidden;height: 100%">
         <router-view :key="$route.fullPath"></router-view>
@@ -76,6 +76,10 @@ function toggleShow(target: string) {
     return;
   }
   show.value = target;
+}
+
+function hideMiddle() {
+  show.value = '';
 }
 
 </script>
