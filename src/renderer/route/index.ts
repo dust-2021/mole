@@ -3,6 +3,7 @@ import ServerPage from "../components/views/ServerPage.vue";
 import ServerConfig from "../components/elements/server/ServerConfig.vue";
 import Room from "../components/elements/room/Room.vue";
 import RoomCreator from "../components/elements/room/RoomCreator.vue";
+import Test from "../components/elements/room/Test.vue";
 
 const routes = [
     {
@@ -25,6 +26,10 @@ const routes = [
         path: "/room/create/:serverName",
         component: RoomCreator,
         props: true,
+    },
+    {
+        path: "/test",
+        component: Test,
     }
 ];
 const router = createRouter({

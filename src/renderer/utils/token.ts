@@ -5,6 +5,7 @@ export class Token {
     public token: string;
     public permission: string[];
     public expire: Date;
+    public admin: boolean;
 
     constructor(token: string) {
         this.token = token;
@@ -16,5 +17,10 @@ export class Token {
         this.username = data.username;
         this.permission = data.permission;
         this.expire = data.expire;
+        this.admin = data.permission.includes("admin");
+    }
+
+    public check() {
+
     }
 }

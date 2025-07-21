@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import {ref, onBeforeMount, onBeforeUnmount} from 'vue'
+import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {Services} from "../../../utils/stores";
-import {server, ipcWsReq, ipcOnce, wsRequest, wsResp, ipcOn, ipcRemove} from "../../../utils/ipcTypes";
+import {ipcOn, ipcOnce, ipcRemove, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import Message from "./Message.vue";
-import {ArrowLeft, Lock, Unlock, CopyDocument } from '@element-plus/icons-vue'
+import {ArrowLeft, CopyDocument, Lock, Unlock} from '@element-plus/icons-vue'
 import SystemMessage from "./SystemMessage.vue";
 
 const props = defineProps({
@@ -43,7 +43,7 @@ const router = useRouter();
 const forbidden = ref(false);
 
 function onMessage(resp: wsResp) {
-  const data: {senderId: number, senderName: string, data: string, timestamp: number} = resp.data;
+  const data: { senderId: number, senderName: string, data: string, timestamp: number } = resp.data;
   messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
 }
 
@@ -70,7 +70,7 @@ async function sendMessage(): Promise<void> {
 }
 
 function onJoinRoom(resp: wsResp) {
-  const data: {id: number, name: string, owner: boolean, addr: string} = resp.data;
+  const data: { id: number, name: string, owner: boolean, addr: string } = resp.data;
   members.value.set(data.id, {
     userId: data.id, username: data.name, addr: data.addr, owner: data.owner
   });
@@ -84,9 +84,9 @@ function onLeaveRoom(resp: wsResp) {
 }
 
 function onOwnerChange(resp: wsResp) {
-  const data: {old: number, new: number} = resp.data;
+  const data: { old: number, new: number } = resp.data;
   const old = {...members.value.get(data.old), owner: false};
-  const new_ = {...members.value.get(data.new), owner: false};
+  const new_ = {...members.value.get(data.new), owner: true};
   messages.value.push({from: 0, text: `房主已移交至${new_.username}`, timestamp: Date.now()});
   members.value.set(data.old, old);
   members.value.set(data.new, new_);
@@ -96,19 +96,29 @@ function onCloseRoom() {
   router.push('/server/' + props.serverName)
 }
 
-async function forbiddenRoom(){
-  if (!self.value.owner){
+function onForbiddenRoom(resp: wsResp) {
+  forbidden.value = resp.data;
+  messages.value.push({
+    from: 0, text: forbidden.value? '房间关闭进入': '房间开放进入', timestamp: Date.now()
+  })
+}
+
+async function forbiddenRoom() {
+  if (!self.value.owner) {
     ElMessage({
       message: '仅房主可用',
       type: 'warning'
     })
     return;
   }
-  await wsRequest({serverName: props.serverName, apiName: 'room.forbidden', args: [props.roomId]},
-  true, 2000, (resp: wsResp) => {
-    if (resp.statusCode === 0) {
-      forbidden.value = !forbidden.value;
-    }
+  await wsRequest({serverName: props.serverName, apiName: 'room.forbidden', args: [props.roomId, !forbidden.value]},
+      2000, (resp: wsResp) => {
+        if (resp.statusCode === 0) {
+          forbidden.value = !forbidden.value;
+          messages.value.push({
+            from: 0, text: forbidden.value? '房间关闭进入': '房间开放进入', timestamp: Date.now()
+          })
+        }
       })
 }
 
@@ -116,18 +126,18 @@ async function forbiddenRoom(){
 onBeforeMount(async () => {
   svr.value = services.get(props.serverName);
   await wsRequest({serverName: props.serverName, apiName: 'room.roommate', args: [props.roomId]},
-      true, 2000, (resp: wsResp) => {
-      if (resp.statusCode !== 0) {
-        ElMessage({
-          showClose: true,
-          message: `获取成员失败：${resp.statusCode}-${resp.data}`,
-          type: 'warning'
-        })
-        return
-      }
+       2000, (resp: wsResp) => {
+        if (resp.statusCode !== 0) {
+          ElMessage({
+            showClose: true,
+            message: `获取成员失败：${resp.statusCode}-${resp.data}`,
+            type: 'warning'
+          })
+          return
+        }
         for (const item of resp.data) {
           // 获取自己的账号信息
-          if (item.name === svr.value.defaultUser.username){
+          if (item.name === svr.value.defaultUser.username) {
             self.value = {
               userId: item.id, username: item.name, addr: item.addr, owner: item.owner
             }
@@ -141,10 +151,11 @@ onBeforeMount(async () => {
         }
       });
   ipcOn(`${props.serverName}.room.in.${props.roomId}`, onJoinRoom)
-  ipcOn(`${props.serverName}.room.owner.${props.roomId}`, onOwnerChange)
+  ipcOn(`${props.serverName}.room.exchangeOwner.${props.roomId}`, onOwnerChange)
   ipcOn(`${props.serverName}.room.out.${props.roomId}`, onLeaveRoom)
   ipcOn(`${props.serverName}.room.message.${props.roomId}`, onMessage)
   ipcOnce(`${props.serverName}.room.close.${props.roomId}`, onCloseRoom)
+  ipcOn(`${props.serverName}.room.forbidden.${props.roomId}`, onForbiddenRoom)
 
 
   mounted.value = true;
@@ -155,9 +166,10 @@ onBeforeUnmount(async () => {
   await wsRequest({serverName: props.serverName, apiName: 'room.out', args: [props.roomId]});
 
   ipcRemove(`${props.serverName}.room.in.${props.roomId}`, onJoinRoom)
-  ipcRemove(`${props.serverName}.room.owner.${props.roomId}`, onOwnerChange)
+  ipcRemove(`${props.serverName}.room.exchangeOwner.${props.roomId}`, onOwnerChange)
   ipcRemove(`${props.serverName}.room.out.${props.roomId}`, onLeaveRoom)
   ipcRemove(`${props.serverName}.room.message.${props.roomId}`, onMessage)
+  ipcRemove(`${props.serverName}.room.forbidden.${props.roomId}`, onForbiddenRoom)
 })
 </script>
 
@@ -165,11 +177,30 @@ onBeforeUnmount(async () => {
   <div style="height: 100%;width: 100%">
     <el-row :gutter="24" v-if="mounted" style="height: 100%;width: 100%">
       <el-col :span="6" style="height: 100%;border-right: 1px solid #eee;">
-        <div>
-          <el-row :gutter="24" class="room-band">
-            <el-col :span="8" class="room-btn"><el-icon :size="24" @click="$router.back()"><ArrowLeft></ArrowLeft></el-icon></el-col>
-            <el-col :span="8" class="room-btn"><el-icon :size="24" @click="forbiddenRoom"><Lock v-if="forbidden"></Lock><Unlock v-else></Unlock></el-icon></el-col>
-            <el-col :span="8" class="room-btn"><el-icon @click="copyRoomId(props.roomId)" :size="24"><CopyDocument></CopyDocument></el-icon></el-col>
+        <div style="margin-bottom: 1px">
+          <el-row :gutter="24">
+            <el-col :span="8" class="room-btn">
+              <el-button class="item-btn">
+                <el-icon :size="18" @click="$router.push('/')">
+                  <ArrowLeft></ArrowLeft>
+                </el-icon>
+              </el-button>
+            </el-col>
+            <el-col :span="8" class="room-btn">
+              <el-button class="item-btn">
+                <el-icon :size="18" @click="forbiddenRoom">
+                  <Lock v-if="forbidden"></Lock>
+                  <Unlock v-else></Unlock>
+                </el-icon>
+              </el-button>
+            </el-col>
+            <el-col :span="8" class="room-btn">
+              <el-button class="item-btn">
+                <el-icon @click="copyRoomId(props.roomId)" :size="18">
+                  <CopyDocument></CopyDocument>
+                </el-icon>
+              </el-button>
+            </el-col>
           </el-row>
         </div>
         <div style="width: 100%;" v-if="mounted">
@@ -178,7 +209,7 @@ onBeforeUnmount(async () => {
                       :noresize="true">
           <div v-for="(k, i) in members" :key="i" class="member-info">
             <el-row :gutter="24">
-              <el-col :span="6">
+              <el-col :span="6" class="center-item">
                 <el-avatar src="" :size="32"></el-avatar>
               </el-col>
               <el-col :span="14">
@@ -203,6 +234,7 @@ onBeforeUnmount(async () => {
                        :username="members.get(message.from)?.username" v-if="message.from !== 0"></Message>
               <SystemMessage :message="message.text" :time="message.timestamp" v-else></SystemMessage>
             </div>
+
           </el-scrollbar>
         </div>
 
@@ -232,12 +264,20 @@ onBeforeUnmount(async () => {
   border-bottom: 1px solid #eeeeee;
   align-items: center;
 }
-.room-band {
-  background: #eeeeee;
-}
+
 .room-btn {
-  padding: 5px 2px;
-  border-radius: 3px;
-  background-color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.item-btn {
+  margin: 5px;
+  border: 0;
+  border-radius: 20%;
+}
+.center-item {
+  display:  flex;
+  justify-items: center;
+  align-items: center;
 }
 </style>

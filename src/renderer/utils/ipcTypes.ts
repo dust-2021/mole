@@ -48,23 +48,22 @@ export function ipcOnce(channel: string, func: (...args: any[]) => void) {
     window['electron'].once(channel, func);
 }
 
-// 使用ipc调用对服务器的http网络请求
+// 使用ipc调用对服务器的http网络请求，网络错误时electron会提示错误，请求错误则需要处理
 export async function request(req: HttpReq): Promise<HttpResp> {
     return await window['electron'].invoke('request', req);
 }
 
+function wsFailedHandler() {
+
+}
+
 // 发送ws消息并返回ipc回调函数引用
-export async function wsRequest(req: ipcWsReq, once: boolean = true, timeout: number = 2000,
-                                callback?: (resp: wsResp) => any, timeoutFunc?: () => any): Promise<(r: wsResp) => any | null> {
+export async function wsRequest(req: ipcWsReq, timeout: number = 2000,
+                                callback?: (resp: wsResp) => any, timeoutFunc?: () => any): Promise<void> {
     if (req.uuid === undefined || req.uuid === '') {
         req.uuid = uuid().toString();
     }
     await window['electron'].invoke("wsRequest", req);
-    let listener = null;
-    if (callback === undefined || callback === null) {
-        return listener;
-    }
-
     if (timeout === undefined || timeout === null || timeout <= 0) {
         timeout = 2000;
     }
@@ -79,27 +78,27 @@ export async function wsRequest(req: ipcWsReq, once: boolean = true, timeout: nu
             })
         }
     }, timeout);
-    listener = function (resp: wsResp) {
+    let listener = function (resp: wsResp) {
         clearTimeout(timer);
-        callback(resp);
+        if (callback) {
+            callback(resp);
+        } else {
+            if (resp.statusCode !== 0) {
+                ElMessage({
+                    showClose: true,
+                    message: `ws请求失败:${resp.data}`,
+                    type: 'error'
+                })
+            }
+        }
     }
-    if (once) {
-        ipcOnce(req.uuid, listener);
-    } else {
-        ipcOn(req.uuid, listener);
-    }
-    return listener;
+    ipcOnce(req.uuid, listener);
 }
 
 // 账号信息
 export type user = {
     username: string,
     password: string,
-}
-
-export type connection = {
-    connected: boolean,
-    user: user,
 }
 
 // 服务器信息

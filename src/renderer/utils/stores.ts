@@ -58,10 +58,13 @@ function createElectronStore<T>(id: string) {
 * */
 export const Services = createElectronStore<server>('Services');
 export const Public = createElectronStore<any>('Public');
+export const Configs = createElectronStore<any>('Configs');
 
 export async function initStore() {
     const svr = Services();
     const pub = Public();
+    const config = Configs();
     await svr.init();
     await pub.init();
+    await config.init();
 }

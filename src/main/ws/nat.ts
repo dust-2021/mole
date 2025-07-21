@@ -19,6 +19,7 @@ class NatCreator {
         this.soc.on('message', this.listener);
     }
 
+    // udp监听处理函数
     private async listener(message: Buffer, info: dgram.RemoteInfo) {
         Logger.info(`Received message ${message} from ${info.address}:${info.port}`);
         const context = String(message);

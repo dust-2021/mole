@@ -20,15 +20,15 @@ async function newServer(): Promise<void> {
 
 <template>
   <div style="height: 100%">
-    <div style="height: 10%; border-bottom: 1px #eee solid;">
-      <el-row :gutter="24">
-        <el-col :span="8">
-          <el-button  @click="newServer">
-            <el-icon><Plus></Plus></el-icon>
+    <div style="border-bottom: 1px #eee solid;">
+      <el-row :gutter="24" style="width: 100%;height: 100%">
+        <el-col :span="8" class="container">
+          <el-button  @click="newServer" class="btn">
+            <el-icon :size="24"><Plus></Plus></el-icon>
           </el-button>
         </el-col>
-        <el-col :span="8">
-          <el-button @click="props.hideMiddle"><el-icon><ArrowLeft></ArrowLeft></el-icon></el-button>
+        <el-col :span="8" class="container">
+          <el-button @click="props.hideMiddle" class="btn"><el-icon :size="24"><ArrowLeft></ArrowLeft></el-icon></el-button>
         </el-col>
       </el-row>
     </div>
@@ -44,5 +44,14 @@ async function newServer(): Promise<void> {
 </template>
 
 <style scoped>
-
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.btn {
+  margin: 5px;
+  border: 0;
+  border-radius: 30%;
+}
 </style>

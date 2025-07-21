@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import {Connection, Loading} from "@element-plus/icons-vue";
+import {Connection, Loading, Timer} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
 import {ipcOn, ipcRemove, request, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
@@ -21,19 +21,19 @@ const props = defineProps({
 // 0 未连接 1 连接中 2 已连接
 const connected = ref<number>(0);
 const ping = ref<number>(0);
-let pingTaskId: NodeJS.Timeout = null;
 
 // 开启或关闭ws连接
 async function activeCon(serverName: string) {
   if (connected.value === 2) {
-    clearInterval(pingTaskId);
     await window['electron'].invoke("wsClose", serverName);
     connected.value = 0;
+    ipcRemove('publish.time', handlePingResp);
   } else {
     connected.value = 1;
     await window['electron'].invoke("wsActive", serverName);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    pingTask();
     connected.value = 2;
-    pingTaskId = setInterval(pingTask, 1000)
   }
   // if (!flag) {
   //   ElMessage({
@@ -58,9 +58,16 @@ async function login(s: server, logout: boolean = false): Promise<void> {
     s.token = resp.data;
   }
 }
+
+// 处理订阅事件的函数
+function handlePingResp(resp: wsResp) {
+  const data: {timestamp: number} = resp.data;
+  ping.value = Date.now() - data.timestamp;
+}
+
+// 订阅服务器时间事件
 function pingTask() {
-  wsRequest({serverName: props.serverName, apiName: 'base.time', args: []}, true, 2000, (resp: wsResp) => {
-    let data: number;
+  wsRequest({serverName: props.serverName, apiName: 'channel.subscribe', args: ['time']}, 2000, (resp: wsResp) => {
     if (resp.statusCode != 0) {
       ElMessage({
         type: 'warning',
@@ -68,8 +75,7 @@ function pingTask() {
       })
       return
     }
-    data = resp.data;
-    ping.value = Date.now() - data;
+    ipcOn('publish.time', handlePingResp);
   })
 }
 

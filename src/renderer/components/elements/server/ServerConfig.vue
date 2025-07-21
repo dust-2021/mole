@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import {server} from '../../../utils/ipcTypes'
+import {request, server, user, wsRequest} from '../../../utils/ipcTypes'
 import {Services} from "../../../utils/stores";
 import {ref, onBeforeMount, toRaw} from "vue";
 import {useRouter} from "vue-router";
-import {Plus} from '@element-plus/icons-vue'
+import {Plus, Refresh} from '@element-plus/icons-vue'
 import DangerButton from "../DangerButton.vue";
+import {ElMessageBox, ElMessage} from "element-plus";
 
 const isNew = ref(false);
 const svr = Services();
@@ -12,6 +13,29 @@ const name = ref<string>("");
 const newServer = ref<server>(null);
 const mounted = ref(false);
 const router = useRouter();
+
+const newUserFlag = ref<boolean>(false);
+const newUserInfo = ref<user>({
+  username: '', password: ''
+});
+
+function addNewUser() {
+  newUserFlag.value = false;
+  for (const u of newServer.value.users) {
+    if (u.username === newUserInfo.value.username) {
+      ElMessage({
+        type: 'error',
+        message: `用户${u.username}已存在!`
+      })
+      return;
+    }
+  }
+  newServer.value.users.push(newUserInfo.value);
+  ElMessage({
+    type: 'success',
+    message: `账号添加成功`,
+  })
+}
 
 // 传递名字则是修改，否则为新建
 const props = defineProps({
@@ -34,6 +58,58 @@ async function remove() {
   }
   await svr.delete(props.serverName);
   await router.push("/");
+}
+
+// 选项卡切换默认账号时重新登录并修改
+async function changeDefaultUser(u: user) {
+  if (u.username === newServer.value.defaultUser.username) {
+    return;
+  }
+  newServer.value.defaultUser = u;
+  const resp = await request({
+    serverName: props.serverName,
+    apiName: "login",
+    args: [newServer.value.defaultUser?.username, newServer.value.defaultUser?.password]
+  });
+  if (!resp.success) {
+    return;
+  }
+  ElMessage({
+    type: resp.statusCode === 0 ? 'success' : 'error',
+    message: `账号切换${resp.statusCode === 0 ? '成功' : 'error:' + resp.msg}`
+  })
+}
+
+async function reLogin() {
+  const resp = await request({
+    serverName: props.serverName,
+    apiName: "login",
+    args: [newServer.value.defaultUser?.username, newServer.value.defaultUser?.password]
+  });
+  if (!resp.success) {
+    return;
+  }
+  ElMessage({
+    type: resp.statusCode === 0 ? 'success' : 'error',
+    message: `刷新${resp.statusCode === 0 ? '成功' : 'error:' + resp.msg}`
+  })
+}
+
+async function deleteUser(index: number) {
+  ElMessageBox.confirm(
+      '是否删除该账号信息？',
+      '',
+      {
+        confirmButtonText: "确认",
+        cancelButtonText: "取消",
+        type: 'warning',
+      }
+  )
+      .then(() => {
+        newServer.value.users.splice(index, 1);
+      })
+      .catch(() => {
+      })
 }
 
 
@@ -61,17 +137,41 @@ onBeforeMount(() => {
         </el-input>
       </el-form-item>
       <el-form-item label="PORT">
-        <el-input v-model="newServer.port" type="number" placeholder="80"></el-input>
+        <el-input v-model="newServer.port" type="number" placeholder="80" style="width: 100px"></el-input>
       </el-form-item>
       <el-form-item label="默认账号">
-        <el-select :placeholder="newServer.defaultUser?.username" style="width: 180px">
+        <el-select :placeholder="newServer.defaultUser?.username"
+                   @change="changeDefaultUser"
+                   style="width: 180px">
           <el-option v-for="u in newServer.users" :value="u">{{ u.username }}</el-option>
         </el-select>
+        <el-button :type="'primary'" @click="reLogin" style="margin-left: 5px">
+          <el-icon>
+            <Refresh></Refresh>
+          </el-icon>
+        </el-button>
       </el-form-item>
       <el-form-item label="账号">
-        <span style="padding: 2px" v-for="u in newServer.users"><el-tag>{{ u.username }}</el-tag></span>
+        <span style="padding: 2px" v-for="(u, i) in newServer.users" :key="i"><el-tag
+            @click="deleteUser(i)">{{ u.username }}</el-tag></span>
         <span style="padding: 2px">
-          <el-tag><el-icon><Plus></Plus></el-icon></el-tag></span>
+          <el-tag><el-icon @click="newUserFlag = true"><Plus></Plus></el-icon></el-tag></span>
+        <el-dialog title="添加账号" v-model="newUserFlag" width="400">
+          <el-form :model="newUserInfo" label-width="auto" style="max-width: 60%">
+            <el-form-item label="用户名：">
+              <el-input v-model="newUserInfo.username" :maxlength="32"></el-input>
+            </el-form-item>
+            <el-form-item label="密码：">
+              <el-input :type="'password'" v-model="newUserInfo.password" style="width: 160px; margin-top: 5px"
+                        :minlength="6"
+                        :maxlength="16"></el-input>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="newUserFlag = false">取消</el-button>
+            <el-button :type="'primary'" @click="addNewUser">添加</el-button>
+          </template>
+        </el-dialog>
       </el-form-item>
       <el-form-item>
         <el-row :gutter="24">

@@ -47,6 +47,11 @@ export async function request(event: Event, req: ipcHttpReq): Promise<HttpResp> 
 export async function wsRequest(event: Event, req: ipcWsReq): Promise<void> {
     try {
         const conn = Connection.getInstance(req.serverName);
+        if (!conn.conn || conn.conn?.readyState !== conn.conn?.OPEN) {
+            const win = Windows.get('main');
+            win?.webContents.send('msg', "未建立ws连接", 'error');
+            return ;
+        }
         const f = WsApi.get(req.apiName);
         const reqBody = {id: req.uuid, method: req.apiName, params: req.args ? req.args : []};
         // 未找到接口规范函数则直接发送ws请求

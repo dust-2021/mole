@@ -51,6 +51,8 @@ const props = defineProps({
 
 .message-avatar {
   margin-right: 10px;
+  display: flex;
+  align-items: center;
 }
 
 .self-message .message-avatar {

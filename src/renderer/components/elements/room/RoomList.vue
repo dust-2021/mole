@@ -72,11 +72,12 @@ onBeforeMount(() => {
 function inputPassword(roomId: string): void {
   ElMessageBox.prompt("输入房间密码", "", {
     confirmButtonText: "OK", cancelButtonText: "取消",
+    inputType: 'password',
     inputPattern: /\w+/,
     inputErrorMessage: "格式错误"
   }).then(async ({value}) => {
     await wsRequest({serverName: props.serverName, apiName: "room.in", args: [roomId, value]},
-        true, 2000, (resp: wsResp) => {
+        2000, (resp: wsResp) => {
           if (resp.statusCode !== 0) {
             ElMessage({
               showClose: true,
@@ -159,10 +160,11 @@ function inputPassword(roomId: string): void {
       </el-table-column>
     </el-table>
   </div>
-  <el-footer height="10%" style="justify-items: right">
-    <el-row :gutter="24">
-      <el-col :span="4"><el-button @click="$router.push('/room/create')">创建</el-button></el-col>
-      <el-col :span="20"><el-pagination :size="'small'" background layout="prev, pager, next" :total="info.total"
+  <el-footer height="10%" style="justify-items: right;">
+    <el-row :gutter="24" style="width: 100%">
+      <el-col :span="4"><el-button @click="$router.push(`/room/create/${props.serverName}`)" :type="'primary'">创建</el-button></el-col>
+      <el-col :span="14"></el-col>
+      <el-col :span="6"><el-pagination :size="'small'" background layout="prev, pager, next" :total="info.total"
       ></el-pagination></el-col>
     </el-row>
 

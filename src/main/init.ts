@@ -1,4 +1,4 @@
-import {Configs, Public, Services} from './public/public';
+import {Configs, Public, Services, Windows} from './public/public';
 import {Connection} from './ws/connection'
 import {registerApis as userApi} from './api/user';
 import {registerApis as systemApi} from './api/server';
@@ -30,6 +30,8 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("wsActive", (Event, serverName: string) => {
         const conn = Connection.getInstance(serverName);
         conn.active();
+        const win = Windows.get('main');
+        win?.webContents?.send('msg', `已建立与服务器${serverName}的连接`, 'info');
     })
     ipc.handle("wsClose", (Event, serverName: string) => {
         if (!Connection.All.has(serverName)) {
@@ -37,6 +39,8 @@ export function initialIPC(ipc: typeof ipcMain) {
         }
         const conn = Connection.getInstance(serverName);
         conn.close();
+        const win = Windows.get('main');
+        win?.webContents?.send('msg', `已关闭与服务器${serverName}的连接`, 'warning');
     })
 }
 
