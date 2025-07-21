@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {request, server, user, wsRequest} from '../../../utils/ipcTypes'
+import {request, server, user, wsRequest} from '../../../utils/publicType'
 import {Services} from "../../../utils/stores";
 import {ref, onBeforeMount, toRaw} from "vue";
 import {useRouter} from "vue-router";

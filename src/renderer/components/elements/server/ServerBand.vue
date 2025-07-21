@@ -2,7 +2,7 @@
 
 import {Connection, Loading, Timer} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {ipcOn, ipcRemove, request, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
+import {ipcOn, ipcRemove, request, server, wsRequest, wsResp} from "../../../utils/publicType";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref, toRaw, watch} from "vue";
-import {wsRequest, ipcWsReq, wsResp} from "../../../utils/ipcTypes";
+import {wsRequest, ipcWsReq, wsResp} from "../../../utils/publicType";
 import DangerButton from "../../elements/DangerButton.vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {Services} from "../../../utils/stores";
-import {ipcOn, ipcOnce, ipcRemove, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
+import {ipcOn, ipcOnce, ipcRemove, server, wsRequest, wsResp} from "../../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import Message from "./Message.vue";

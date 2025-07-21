@@ -1,5 +1,5 @@
 import {defineStore} from 'pinia';
-import {server} from "./ipcTypes";
+import {server} from "./publicType";
 
 function createElectronStore<T>(id: string) {
     return defineStore(id, {

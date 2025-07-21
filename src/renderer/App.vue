@@ -51,7 +51,7 @@ import {Close, Crop, Minus} from "@element-plus/icons-vue";
 import {ref} from "vue";
 import ServerItems from "./components/elements/server/ServerItems.vue";
 import {useRouter} from "vue-router";
-import {ipcSend, ipcOn} from "./utils/ipcTypes";
+import {ipcSend, ipcOn} from "./utils/publicType";
 import {ElMessage} from 'element-plus'
 
 async function handle(msg: string): Promise<void> {

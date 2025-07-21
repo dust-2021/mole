@@ -15,11 +15,11 @@ export type HttpResp = {
     msg?: string
 }
 
-export type ipcWsReq = {
-    serverName: string,
-    uuid?: string,
-    apiName: string,
-    args: any[]
+export type wsReq = {
+    id: string,
+    method: string,
+    params: any[],
+    signature?: string,
 }
 
 export type wsResp = {
@@ -51,10 +51,6 @@ export function ipcOnce(channel: string, func: (...args: any[]) => void) {
 // 使用ipc调用对服务器的http网络请求，网络错误时electron会提示错误，请求错误则需要处理
 export async function request(req: HttpReq): Promise<HttpResp> {
     return await window['electron'].invoke('request', req);
-}
-
-function wsFailedHandler() {
-
 }
 
 // 发送ws消息并返回ipc回调函数引用

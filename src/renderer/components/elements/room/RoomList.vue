@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {onBeforeMount, ref, computed} from "vue";
-import {request, server, wsRequest, wsResp} from "../../../utils/ipcTypes";
+import {request, server, wsRequest, wsResp} from "../../../utils/publicType";
 import {Connection, Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
 import {ElMessage, ElMessageBox} from "element-plus";

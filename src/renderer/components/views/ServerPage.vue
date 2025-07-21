@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref, onBeforeMount, computed} from "vue";
-import {server} from '../../utils/ipcTypes'
+import {server} from '../../utils/publicType'
 import {Services} from "../../utils/stores";
 import RoomList from "../elements/room/RoomList.vue";
 import ServerConfig from "../elements/server/ServerConfig.vue";

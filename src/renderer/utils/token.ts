@@ -1,3 +1,5 @@
+import {Buffer} from "node:buffer";
+
 export class Token {
     public userId: number;
     public userUuid: string;
