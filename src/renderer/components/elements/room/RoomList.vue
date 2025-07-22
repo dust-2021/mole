@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {onBeforeMount, ref, computed} from "vue";
-import {request, server, wsResp} from "../../../utils/publicType";
+import {server, wsResp} from "../../../utils/publicType";
 import {roomIn} from '../../../utils/api/ws/room'
+import {roomList, roomInfo} from '../../../utils/api/http/server'
 import {Connection, Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
 import {ElMessage, ElMessageBox} from "element-plus";
@@ -16,48 +17,32 @@ const props = defineProps(
     }
 )
 
-interface Room {
-  roomId: string,
-  roomTitle: string,
-  description: string,
-  ownerId: number,
-  ownerName: string,
-  memberCount: number,
-  memberMax: number,
-  withPassword: boolean,
-  forbidden: boolean
-}
-
-interface response {
-  total: number;
-  rooms: Room[];
-}
-
 const mounted = ref(false);
-let info = ref<response>({total: 0, rooms: []});
+let info = ref<{ total: number, rooms: roomInfo[] }>({total: 0, rooms: []});
+const pageSize = ref<number>(10);
+const curPage = ref<number>(1);
 const services = Services();
 const svr = ref<server>(null);
 const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
-  if (svr.value.token === null || svr.value.token === undefined || svr.value.token === "") {
-    ElMessage({
-      showClose: true,
-      type: "warning",
-      message: "请登录获取令牌"
-    })
-    return
-  }
-  const data = await request({serverName: props.serverName, apiName: "roomList"})
-  if (!data.success && data.statusCode !== 0) {
-    return;
-  }
-  info.value = data.data;
+  info.value = await roomList(props.serverName, curPage.value, pageSize.value);
+}
+
+async function pageChange(v: number): Promise<void> {
+  curPage.value = v;
+  await getRoomInfo();
+}
+
+async function sizeChange(v: number): Promise<void> {
+  pageSize.value = v;
+  curPage.value = 1;
+  await getRoomInfo();
 }
 
 const searchWords = ref("");
 const filterRooms = computed(() => {
-  return info.value.rooms.filter((room: Room) => {
+  return info.value.rooms.filter((room: roomInfo) => {
     return !searchWords.value || room.roomTitle.includes(searchWords.value)
         || room.ownerName.includes(searchWords.value) || room.description.includes(searchWords.value);
   })
@@ -78,16 +63,16 @@ function inputPassword(roomId: string): void {
     inputErrorMessage: "格式错误"
   }).then(async ({value}) => {
     await roomIn(props.serverName, roomId, value.length === 0 ? undefined : value, (resp: wsResp) => {
-          if (resp.statusCode !== 0) {
-            ElMessage({
-              showClose: true,
-              message: `连接房间失败：${resp.statusCode}-${resp.data}`,
-              type: "warning",
-            } as any)
-            return
-          }
-          router.push(`/room/page/${props.serverName}/${roomId}`)
-        })
+      if (resp.statusCode !== 0) {
+        ElMessage({
+          showClose: true,
+          message: `连接房间失败：${resp.statusCode}-${resp.data}`,
+          type: "warning",
+        } as any)
+        return
+      }
+      router.push(`/room/page/${props.serverName}/${roomId}`)
+    })
   })
 }
 
@@ -95,13 +80,14 @@ function inputPassword(roomId: string): void {
 
 <template>
   <div style="height: 90%">
-    <el-table :data="filterRooms" style="width: 100%" v-if="mounted" :empty-text="svr.token?`未找到房间`: `未登录`">
+    <el-table :data="filterRooms" style="width: 100%" v-if="mounted" :empty-text="svr.token?`未找到房间`: `未登录`"
+    :max-height="500" highlight-current-row>
       <el-table-column prop="roomTitle" label="标题" width="100" show-overflow-tooltip></el-table-column>
       <el-table-column prop="description" label="房间描述" show-overflow-tooltip></el-table-column>
       <el-table-column prop="ownerName" label="创建人" width="100" show-overflow-tooltip></el-table-column>
       <el-table-column label="成员" width="80">
         <template #default="scope">
-          <el-tag :type="scope.row.memberCount < scope.row.memberMax?'primary': 'danger'" size="small">
+          <el-tag :type="(scope.row.memberCount < scope.row.memberMax)?'primary': 'danger'" size="small">
             {{ `${scope.row.memberCount}/${scope.row.memberMax}` }}
           </el-tag>
         </template>
@@ -155,10 +141,16 @@ function inputPassword(roomId: string): void {
   </div>
   <el-footer height="10%" style="justify-items: right;">
     <el-row :gutter="24" style="width: 100%">
-      <el-col :span="4"><el-button @click="$router.push(`/room/create/${props.serverName}`)" :type="'primary'">创建</el-button></el-col>
-      <el-col :span="14"></el-col>
-      <el-col :span="6"><el-pagination :size="'small'" background layout="prev, pager, next" :total="info.total"
-      ></el-pagination></el-col>
+      <el-col :span="4">
+        <el-button @click="$router.push(`/room/create/${props.serverName}`)" :type="'primary'">创建</el-button>
+      </el-col>
+      <el-col :span="4"></el-col>
+      <el-col :span="16">
+        <el-pagination :size="'small'" background layout="prev, pager, next, jumper, sizes" :total="info.total"
+                       @current-change="pageChange" :current-page="curPage" :page-size="pageSize"
+                       @size-change="sizeChange" :page-sizes="[10, 20, 50, 100]"
+        ></el-pagination>
+      </el-col>
     </el-row>
 
   </el-footer>

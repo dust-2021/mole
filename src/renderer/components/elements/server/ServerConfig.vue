@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {request, server, user} from '../../../utils/publicType'
+import {server, user} from '../../../utils/publicType'
 import {Services} from "../../../utils/stores";
+import {login} from '../../../utils/api/http/user'
 import {ref, onBeforeMount, toRaw} from "vue";
 import {useRouter} from "vue-router";
 import {Plus, Refresh} from '@element-plus/icons-vue'
@@ -66,32 +67,18 @@ async function changeDefaultUser(u: user) {
     return;
   }
   newServer.value.defaultUser = u;
-  const resp = await request({
-    serverName: props.serverName,
-    apiName: "login",
-    args: [newServer.value.defaultUser?.username, newServer.value.defaultUser?.password]
-  });
-  if (!resp.success) {
-    return;
-  }
+  await login(props.serverName,newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
   ElMessage({
-    type: resp.statusCode === 0 ? 'success' : 'error',
-    message: `账号切换${resp.statusCode === 0 ? '成功' : 'error:' + resp.msg}`
+    type: 'success',
+    message: '账号信息切换至：' + newServer.value.defaultUser.username
   })
 }
 
 async function reLogin() {
-  const resp = await request({
-    serverName: props.serverName,
-    apiName: "login",
-    args: [newServer.value.defaultUser?.username, newServer.value.defaultUser?.password]
-  });
-  if (!resp.success) {
-    return;
-  }
+  await login(props.serverName,newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
   ElMessage({
-    type: resp.statusCode === 0 ? 'success' : 'error',
-    message: `刷新${resp.statusCode === 0 ? '成功' : 'error:' + resp.msg}`
+    type: 'success',
+    message: 'token已刷新'
   })
 }
 

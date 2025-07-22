@@ -2,10 +2,11 @@
 
 import {Connection, Loading} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {request, server, wsResp} from "../../../utils/publicType";
+import {server, wsResp} from "../../../utils/publicType";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
 import {subscribe, unsubscribe} from "../../../utils/api/ws/channel";
+import {login} from '../../../utils/api/http/user'
 import {auth} from '../../../utils/api/ws/base'
 import {Connection as wsConn} from "../../../utils/ws/conn";
 
@@ -49,21 +50,6 @@ async function activeCon() {
   // }
 }
 
-async function login(s: server, logout: boolean = false): Promise<void> {
-  if (!s.defaultUser) {
-    return
-  }
-
-  const resp = await request({
-    apiName: logout ? 'logout' : 'login',
-    serverName: props.serverName,
-    args: [s.defaultUser.username, s.defaultUser.password]
-  });
-  if (!logout && resp.success && resp.statusCode === 0) {
-    s.token = resp.data;
-  }
-}
-
 // 订阅服务器时间事件
 function pingTask() {
   subscribe(props.serverName, 'time', (resp: wsResp) => {
@@ -80,7 +66,7 @@ function pingTask() {
 }
 
 onBeforeMount(() => {
-  login(props.curServer)
+  login(props.serverName, props.curServer.defaultUser?.username, props.curServer.defaultUser?.password).then();
 
 });
 

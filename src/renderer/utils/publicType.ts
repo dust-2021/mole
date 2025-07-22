@@ -1,14 +1,7 @@
-export type HttpReq = {
-    serverName: string,
-    apiName: string,
-    args?: any[]
-}
-
 export type HttpResp = {
-    success: boolean,
-    statusCode: number,
+    code: number,
     data?: any,
-    msg?: string
+    message?: string
 }
 
 export type wsReq = {
@@ -42,11 +35,6 @@ export function ipcRemove(channel: string, func: (...args: any[]) => void) {
 
 export function ipcOnce(channel: string, func: (...args: any[]) => void) {
     window['electron'].once(channel, func);
-}
-
-// 使用ipc调用对服务器的http网络请求，网络错误时electron会提示错误，请求错误则需要处理
-export async function request(req: HttpReq): Promise<HttpResp> {
-    return await window['electron'].invoke('request', req);
 }
 
 // 账号信息
