@@ -1,22 +1,21 @@
-import {WebSocket as socket, MessageEvent} from 'ws';
 import {Services, Public} from "../stores";
-import {wsReq, wsResp} from '../publicType'
+import {server, wsReq, wsResp} from '../publicType'
 import {ElMessage} from "element-plus";
+import {v4 as uuid} from "uuid";
+
 
 // ws响应处理函数类型，传入当前服务器ws连接类和ws报文
-export type wsHandleFunc = (conn: Connection, resp: wsResp) => any;
-
-const svr = Services();
-const pub = Public();
+export type wsHandleFunc = (resp: wsResp) => any;
 
 export class Connection {
     static All: Map<string, Connection> = new Map();
-    private conn: socket | null = null;
+    private conn: WebSocket = null;
     private handleByMethod = new Map<string, wsHandleFunc>();
     private handleById = new Map<string, wsHandleFunc>();
 
     private constructor(public serverName: string) {
-        if (!svr.has(serverName)) {
+        const s = Services();
+        if (!s.has(serverName)) {
             throw new Error(`No service available for ${serverName}`);
         }
         Connection.All.set(serverName, this);
@@ -34,20 +33,13 @@ export class Connection {
         if (this.conn && this.conn.readyState === this.conn.OPEN) {
             return;
         }
-        const server = svr.get(this.serverName);
-        this.conn = new socket(`${server?.host}:${server?.port}/ws`, {
-            headers: {
-                "Token": server?.token,
-                "Mac": pub.has("mac") ? pub.get("mac") : "",
-            }
-        });
+        const svr = Services().get(this.serverName);
+        this.conn = new WebSocket(`${svr.host}:${svr.port}/ws`);
         this.conn.onmessage = this.handle.bind(this);
         this.conn.onerror = (event) => {
             // Logger.error("wsError:" + event.message)
         }
         this.conn.onclose = () => {
-            // const win = Windows.get('main');
-            // win?.webContents?.send(`wsClose.${this.serverName}`);
         }
 
     }
@@ -74,18 +66,15 @@ export class Connection {
             return;
         }
         const r: wsResp = JSON.parse(data);
+        let f: wsHandleFunc;
         try {
             // 响应服务器消息
             if (this.handleByMethod.has(r.method)) {
-                const f = this.handleByMethod.get(r.method);
-                f?.(this, r);
-
+                f = this.handleByMethod.get(r.method);
             } else if (this.handleById.has(r.id)) {
-                const f = this.handleById.get(r.id);
-                f?.(this, r);
-            } else {
-
+                f = this.handleById.get(r.id);
             }
+            f?.(r);
         } catch (e) {
             console.error(e);
         } finally {
@@ -102,23 +91,26 @@ export class Connection {
             })
             return;
         }
-        this.conn.send(JSON.stringify(msg), (err: Error) => {
-            if (err) {
-                ElMessage({
-                    type: 'error',
-                    message: '发送ws请求错误：' + err.message,
-                })
-            } else {
-                if (handle) {
-                    this.handleById.set(msg.id, handle);
-                }
-            }
-        });
-
+        this.conn.send(JSON.stringify(msg));
+        if (handle) {
+            this.handleById.set(msg.id, handle);
+        }
     }
 
-    // 添加ws处理函数
-    public addMethodHandler(key: string, handler: wsHandleFunc): void {
-        this.handleByMethod.set(key, handler);
+    // 添加或删除ws处理函数
+    public methodHandler(key: string, handler?: wsHandleFunc): void {
+        if (handler) {
+            this.handleByMethod.set(key, handler);
+        } else {
+            this.handleByMethod.delete(key);
+        }
     }
+}
+
+export async function wsRequest(serverName: string, method: string, args?: any[], handle?: wsHandleFunc) {
+    const conn = Connection.getInstance(serverName);
+    const id: string = uuid().toString();
+    const req: wsReq = {id: id, method: method, params: args}
+    await conn.send(req, handle);
+    return id;
 }

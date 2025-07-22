@@ -1,10 +1,13 @@
 <script setup lang="ts">
 
-import {Connection, Loading, Timer} from "@element-plus/icons-vue";
+import {Connection, Loading} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {ipcOn, ipcRemove, request, server, wsRequest, wsResp} from "../../../utils/publicType";
+import {request, server, wsResp} from "../../../utils/publicType";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
+import {subscribe, unsubscribe} from "../../../utils/api/ws/channel";
+import {auth} from '../../../utils/api/ws/base'
+import {Connection as wsConn} from "../../../utils/ws/conn";
 
 const router = useRouter()
 const props = defineProps({
@@ -18,21 +21,23 @@ const props = defineProps({
   }
 })
 
+const conn = wsConn.getInstance(props.serverName);
 // 0 未连接 1 连接中 2 已连接
 const connected = ref<number>(0);
 const ping = ref<number>(0);
 
 // 开启或关闭ws连接
-async function activeCon(serverName: string) {
+async function activeCon() {
   if (connected.value === 2) {
-    await window['electron'].invoke("wsClose", serverName);
+    await unsubscribe(props.serverName, 'time');
+    conn.close();
     connected.value = 0;
-    ipcRemove('publish.time', handlePingResp);
   } else {
     connected.value = 1;
-    await window['electron'].invoke("wsActive", serverName);
+    conn.active();
     await new Promise(resolve => setTimeout(resolve, 500));
     pingTask();
+    await auth(props.serverName);
     connected.value = 2;
   }
   // if (!flag) {
@@ -59,15 +64,9 @@ async function login(s: server, logout: boolean = false): Promise<void> {
   }
 }
 
-// 处理订阅事件的函数
-function handlePingResp(resp: wsResp) {
-  const data: {timestamp: number} = resp.data;
-  ping.value = Date.now() - data.timestamp;
-}
-
 // 订阅服务器时间事件
 function pingTask() {
-  wsRequest({serverName: props.serverName, apiName: 'channel.subscribe', args: ['time']}, 2000, (resp: wsResp) => {
+  subscribe(props.serverName, 'time', (resp: wsResp) => {
     if (resp.statusCode != 0) {
       ElMessage({
         type: 'warning',
@@ -75,7 +74,8 @@ function pingTask() {
       })
       return
     }
-    ipcOn('publish.time', handlePingResp);
+    const data: {timestamp: number} = resp.data;
+    ping.value = Date.now() - data.timestamp;
   })
 }
 
@@ -85,10 +85,11 @@ onBeforeMount(() => {
 });
 
 onBeforeUnmount(() => {
-  if (connected.value === 2) {
-    activeCon(props.serverName)
+  if (connected.value > 2) {
+    unsubscribe(props.serverName, 'time').then(() => {
+      conn.close();
+    });
   }
-  // login(props.curServer, true)
 })
 
 </script>
@@ -102,7 +103,7 @@ onBeforeUnmount(() => {
     </el-col>
     <el-col :span="8">
       <el-button :class="{'connected-box': connected === 2, 'disconnected-box': connected !== 2}"
-                  @click="activeCon(serverName)" v-if="curServer.defaultUser" :disabled="connected === 1"
+                  @click="activeCon()" v-if="curServer.defaultUser" :disabled="connected === 1"
                  style="width: 80%"
       >
         <el-icon :size="16" v-if="connected === 0">

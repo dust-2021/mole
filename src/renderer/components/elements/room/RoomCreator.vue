@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {ref, toRaw, watch} from "vue";
-import {wsRequest, ipcWsReq, wsResp} from "../../../utils/publicType";
+import {wsResp} from "../../../utils/publicType";
+import {roomCreate} from "../../../utils/api/ws/room";
 import DangerButton from "../../elements/DangerButton.vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
@@ -35,7 +36,7 @@ watch(withPassword, (o: boolean, n: boolean) => {
 })
 
 async function submit() {
-  await wsRequest({serverName: props.serverName, apiName: "room.create", args: [toRaw(formData.value)]}, 2000, (r: wsResp) => {
+  await roomCreate(props.serverName,toRaw(formData.value),(r: wsResp) => {
     if (r.statusCode !== 0) {
       ElMessage({
         type: "error",

@@ -1,18 +1,13 @@
 import {
     Api,
-    WsApi,
     Services,
     ipcHttpReq,
     HttpResp,
-    ipcWsReq,
-    wsRespBody,
     Windows,
     wsSender,
     Logger
 } from "../public/public";
-import {v4 as uuid} from 'uuid';
 import Event = Electron.IpcMainInvokeEvent;
-import {Connection} from "../ws/connection";
 
 // 向服务器发送请求
 export async function request(event: Event, req: ipcHttpReq): Promise<HttpResp> {
@@ -42,29 +37,3 @@ export async function request(event: Event, req: ipcHttpReq): Promise<HttpResp> 
         return {success: false, statusCode: 0, msg: "api call error:" + error.message};
     }
 }
-
-// ipc中间调用ws接口，返回该次ws发送到服务器的唯一ID
-export async function wsRequest(event: Event, req: ipcWsReq): Promise<void> {
-    try {
-        const conn = Connection.getInstance(req.serverName);
-        if (!conn.conn || conn.conn?.readyState !== conn.conn?.OPEN) {
-            const win = Windows.get('main');
-            win?.webContents.send('msg', "未建立ws连接", 'error');
-            return ;
-        }
-        const f = WsApi.get(req.apiName);
-        const reqBody = {id: req.uuid, method: req.apiName, params: req.args ? req.args : []};
-        // 未找到接口规范函数则直接发送ws请求
-        if (!f) {
-            await conn.send(reqBody);
-            return ;
-        }
-        await f(reqBody);
-    }
-    catch (error: any) {
-        const win = Windows.get('main');
-        win?.webContents.send('msg', "wsRequest error:" + error.message, 'error');
-    }
-}
-
-

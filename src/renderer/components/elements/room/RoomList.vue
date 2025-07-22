@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {onBeforeMount, ref, computed} from "vue";
-import {request, server, wsRequest, wsResp} from "../../../utils/publicType";
+import {request, server, wsResp} from "../../../utils/publicType";
+import {roomIn} from '../../../utils/api/ws/room'
 import {Connection, Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
 import {ElMessage, ElMessageBox} from "element-plus";
@@ -76,8 +77,7 @@ function inputPassword(roomId: string): void {
     inputPattern: /\w+/,
     inputErrorMessage: "格式错误"
   }).then(async ({value}) => {
-    await wsRequest({serverName: props.serverName, apiName: "room.in", args: [roomId, value]},
-        2000, (resp: wsResp) => {
+    await roomIn(props.serverName, roomId, value.length === 0 ? undefined : value, (resp: wsResp) => {
           if (resp.statusCode !== 0) {
             ElMessage({
               showClose: true,
@@ -87,13 +87,6 @@ function inputPassword(roomId: string): void {
             return
           }
           router.push(`/room/page/${props.serverName}/${roomId}`)
-        },
-        () => {
-          ElMessage({
-            showClose: true,
-            message: "请求超时",
-            type: "warning",
-          } as any)
         })
   })
 }

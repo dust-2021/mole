@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {Services} from "../../../utils/stores";
-import {ipcOn, ipcOnce, ipcRemove, server, wsRequest, wsResp} from "../../../utils/publicType";
+import {server, wsResp} from "../../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import Message from "./Message.vue";
 import {ArrowLeft, CopyDocument, Lock, Unlock} from '@element-plus/icons-vue'
 import SystemMessage from "./SystemMessage.vue";
+import {Connection} from "../../../utils/ws/conn";
+import {roomOut, roomMessage, roomForbidden, roomMates} from '../../../utils/api/ws/room'
+import {Mutex} from 'async-mutex';
 
 const props = defineProps({
   serverName: {
@@ -36,15 +39,23 @@ const mounted = ref(false);
 const services = Services();
 const svr = ref<server>(null);
 const messages = ref<message[]>(null);
+const messagesLock: Mutex = new Mutex();
 const members = ref<Map<number, member>>(new Map());
 const self = ref<member>(null);
 const inputMessage = ref<string>('');
 const router = useRouter();
 const forbidden = ref(false);
+const conn = Connection.getInstance(props.serverName);
 
-function onMessage(resp: wsResp) {
-  const data: { senderId: number, senderName: string, data: string, timestamp: number } = resp.data;
-  messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
+async function onMessage(resp: wsResp) {
+  const r = await messagesLock.acquire();
+  try {
+    const data: { senderId: number, senderName: string, data: string, timestamp: number } = resp.data;
+    messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
+  } catch (error) {
+  } finally {
+    r();
+  }
 }
 
 function copyRoomId(msg: string) {
@@ -60,13 +71,31 @@ async function sendMessage(): Promise<void> {
   if (inputMessage.value === "") {
     return;
   }
-  await wsRequest({serverName: props.serverName, apiName: 'room.message', args: [props.roomId, inputMessage.value]})
-  messages.value.push({
-    from: self.value.userId,
-    text: inputMessage.value,
-    timestamp: Date.now()
-  })
-  inputMessage.value = "";
+  await roomMessage(props.serverName, props.roomId, inputMessage.value, async (r) => {
+    if (r.statusCode !== 0) {
+      ElMessage({
+        type: 'error',
+        message: '消息发送失败：' + r.data,
+        showClose: true,
+      })
+      inputMessage.value = "";
+      return;
+    }
+    const release = await messagesLock.acquire();
+    try {
+      messages.value.push({
+        from: self.value.userId,
+        text: inputMessage.value,
+        timestamp: Date.now()
+      })
+      inputMessage.value = "";
+    } catch (e) {
+
+    } finally {
+      release();
+    }
+  });
+
 }
 
 function onJoinRoom(resp: wsResp) {
@@ -99,7 +128,7 @@ function onCloseRoom() {
 function onForbiddenRoom(resp: wsResp) {
   forbidden.value = resp.data;
   messages.value.push({
-    from: 0, text: forbidden.value? '房间关闭进入': '房间开放进入', timestamp: Date.now()
+    from: 0, text: forbidden.value ? '房间关闭进入' : '房间开放进入', timestamp: Date.now()
   })
 }
 
@@ -111,22 +140,21 @@ async function forbiddenRoom() {
     })
     return;
   }
-  await wsRequest({serverName: props.serverName, apiName: 'room.forbidden', args: [props.roomId, !forbidden.value]},
-      2000, (resp: wsResp) => {
-        if (resp.statusCode === 0) {
-          forbidden.value = !forbidden.value;
-          messages.value.push({
-            from: 0, text: forbidden.value? '房间关闭进入': '房间开放进入', timestamp: Date.now()
-          })
-        }
+  await roomForbidden(props.serverName, props.roomId, (resp: wsResp) => {
+    if (resp.statusCode === 0) {
+      forbidden.value = !forbidden.value;
+      messages.value.push({
+        from: 0, text: forbidden.value ? '房间关闭进入' : '房间开放进入', timestamp: Date.now()
       })
+    }
+  });
 }
 
 
 onBeforeMount(async () => {
   svr.value = services.get(props.serverName);
-  await wsRequest({serverName: props.serverName, apiName: 'room.roommate', args: [props.roomId]},
-       2000, (resp: wsResp) => {
+  await roomMates(props.serverName, props.roomId,
+      (resp: wsResp) => {
         if (resp.statusCode !== 0) {
           ElMessage({
             showClose: true,
@@ -150,12 +178,12 @@ onBeforeMount(async () => {
           })
         }
       });
-  ipcOn(`${props.serverName}.room.in.${props.roomId}`, onJoinRoom)
-  ipcOn(`${props.serverName}.room.exchangeOwner.${props.roomId}`, onOwnerChange)
-  ipcOn(`${props.serverName}.room.out.${props.roomId}`, onLeaveRoom)
-  ipcOn(`${props.serverName}.room.message.${props.roomId}`, onMessage)
-  ipcOnce(`${props.serverName}.room.close.${props.roomId}`, onCloseRoom)
-  ipcOn(`${props.serverName}.room.forbidden.${props.roomId}`, onForbiddenRoom)
+  conn.methodHandler(`room.in`, onJoinRoom)
+  conn.methodHandler(`room.exchangeOwner`, onOwnerChange)
+  conn.methodHandler(`room.out`, onLeaveRoom)
+  conn.methodHandler(`room.message`, onMessage)
+  conn.methodHandler(`room.close`, onCloseRoom)
+  conn.methodHandler(`room.forbidden`, onForbiddenRoom)
 
 
   mounted.value = true;
@@ -163,13 +191,14 @@ onBeforeMount(async () => {
 })
 
 onBeforeUnmount(async () => {
-  await wsRequest({serverName: props.serverName, apiName: 'room.out', args: [props.roomId]});
+  await roomOut(props.serverName, props.roomId);
 
-  ipcRemove(`${props.serverName}.room.in.${props.roomId}`, onJoinRoom)
-  ipcRemove(`${props.serverName}.room.exchangeOwner.${props.roomId}`, onOwnerChange)
-  ipcRemove(`${props.serverName}.room.out.${props.roomId}`, onLeaveRoom)
-  ipcRemove(`${props.serverName}.room.message.${props.roomId}`, onMessage)
-  ipcRemove(`${props.serverName}.room.forbidden.${props.roomId}`, onForbiddenRoom)
+  conn.methodHandler(`room.in`)
+  conn.methodHandler(`room.exchangeOwner`)
+  conn.methodHandler(`room.out`)
+  conn.methodHandler(`room.message`)
+  conn.methodHandler(`room.close`)
+  conn.methodHandler(`room.forbidden`)
 })
 </script>
 
@@ -270,13 +299,15 @@ onBeforeUnmount(async () => {
   justify-content: center;
   align-items: center;
 }
+
 .item-btn {
   margin: 5px;
   border: 0;
   border-radius: 20%;
 }
+
 .center-item {
-  display:  flex;
+  display: flex;
   justify-items: center;
   align-items: center;
 }
