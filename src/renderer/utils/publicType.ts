@@ -23,6 +23,10 @@ export async function ipcSend(msg: string) {
     await window['electron'].send(msg);
 }
 
+export function log(level: string, message?: string) {
+    window['electron'].send('log', level, message).then();
+}
+
 // ipc事件监听
 export function ipcOn(channel: string, func: (...args: any[]) => void) {
     window['electron'].on(channel, func);

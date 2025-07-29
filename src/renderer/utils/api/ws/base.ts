@@ -1,8 +1,8 @@
 import {wsRequest, wsHandleFunc} from '../../ws/conn'
 import {ElMessage} from "element-plus";
-import {Services, Public} from "../../stores";
+import {Services, MacAddress} from "../../stores";
 
-// 订阅频道
+//
 export async function auth(server: string, handle?: wsHandleFunc) {
     const svr = Services().get(server);
     if (!svr.token) {
@@ -13,9 +13,8 @@ export async function auth(server: string, handle?: wsHandleFunc) {
         return
     }
     let args = [svr.token];
-    const pub = Public();
-    if (pub.get('mac')) {
-        args.push(pub.get('mac'));
+    if (MacAddress !== '') {
+        args.push(MacAddress);
     }
     await wsRequest(server, 'base.auth', args, handle);
 }

@@ -1,5 +1,5 @@
 import {app, BrowserWindow, ipcMain} from "electron";
-import {Public, Windows} from "../public/public";
+import {BaseDir} from "../public/public";
 import path from "path";
 
 export function mainWindow() {
@@ -10,7 +10,7 @@ export function mainWindow() {
         // backgroundColor: '#00000000',
         frame: false,
         webPreferences: {
-            preload: path.join(Public.get("basedir"), 'main/preload.js'),
+            preload: path.join(BaseDir, 'main/preload.js'),
             nodeIntegration: false,
             contextIsolation: true
         }
@@ -35,7 +35,6 @@ export function mainWindow() {
         mainWindow.loadURL('http://localhost:3000');
         mainWindow.webContents.openDevTools(); // 打开开发者工具
     } else {
-        mainWindow.loadFile(path.join(Public.get('basedir'), 'renderer/index.html'));
+        mainWindow.loadFile(path.join(BaseDir, 'renderer/index.html'));
     }
-    Windows.set('main', mainWindow);
 }

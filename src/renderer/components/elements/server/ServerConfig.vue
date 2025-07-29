@@ -15,6 +15,7 @@ const newServer = ref<server>(null);
 const mounted = ref(false);
 const router = useRouter();
 
+// 弹出框控制
 const newUserFlag = ref<boolean>(false);
 const newUserInfo = ref<user>({
   username: '', password: ''
@@ -31,11 +32,12 @@ function addNewUser() {
       return;
     }
   }
-  newServer.value.users.push(newUserInfo.value);
+  newServer.value.users.push(toRaw(newUserInfo.value));
   ElMessage({
     type: 'success',
     message: `账号添加成功`,
   })
+  newUserInfo.value = {username: '', password: ''}
 }
 
 // 传递名字则是修改，否则为新建
@@ -48,7 +50,7 @@ const props = defineProps({
 
 async function add() {
   if (isNew.value) {
-    await svr.set(name.value, toRaw(newServer.value));
+    svr.set(name.value, toRaw(newServer.value));
     await router.push("/server/" + name.value);
   }
 }
@@ -57,7 +59,7 @@ async function remove() {
   if (isNew.value) {
     return;
   }
-  await svr.delete(props.serverName);
+  svr.delete(props.serverName);
   await router.push("/");
 }
 
@@ -66,8 +68,8 @@ async function changeDefaultUser(u: user) {
   if (u.username === newServer.value.defaultUser.username) {
     return;
   }
-  newServer.value.defaultUser = u;
   await login(props.serverName,newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  newServer.value.defaultUser = u;
   ElMessage({
     type: 'success',
     message: '账号信息切换至：' + newServer.value.defaultUser.username

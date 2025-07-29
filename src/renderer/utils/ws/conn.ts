@@ -1,5 +1,5 @@
-import {Services, Public} from "../stores";
-import {server, wsReq, wsResp} from '../publicType'
+import {Services} from "../stores";
+import {wsReq, wsResp} from '../publicType'
 import {ElMessage} from "element-plus";
 import {v4 as uuid} from "uuid";
 
@@ -34,7 +34,15 @@ export class Connection {
             return;
         }
         const svr = Services().get(this.serverName);
-        this.conn = new WebSocket(`${svr.host}:${svr.port}/ws`);
+        try {
+            this.conn = new WebSocket(`${svr.host}:${svr.port}/ws`);
+        } catch (e) {
+            ElMessage({
+                type: 'error',
+                message: `建立与${this.serverName}连接失败：${e}`
+            })
+            return;
+        }
         this.conn.onmessage = this.handle.bind(this);
         this.conn.onerror = (event) => {
             // Logger.error("wsError:" + event.message)

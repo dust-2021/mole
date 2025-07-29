@@ -178,12 +178,12 @@ onBeforeMount(async () => {
           })
         }
       });
-  conn.methodHandler(`room.in`, onJoinRoom)
-  conn.methodHandler(`room.exchangeOwner`, onOwnerChange)
-  conn.methodHandler(`room.out`, onLeaveRoom)
-  conn.methodHandler(`room.message`, onMessage)
-  conn.methodHandler(`room.close`, onCloseRoom)
-  conn.methodHandler(`room.forbidden`, onForbiddenRoom)
+  conn.methodHandler(`publish.room.notice.in`, onJoinRoom)
+  conn.methodHandler(`publish.room.notice.exchangeOwner`, onOwnerChange)
+  conn.methodHandler(`publish.room.notice.out`, onLeaveRoom)
+  conn.methodHandler(`publish.room.message`, onMessage)
+  conn.methodHandler(`publish.room.notice.close`, onCloseRoom)
+  conn.methodHandler(`publish.room.notice.forbidden`, onForbiddenRoom)
 
 
   mounted.value = true;
@@ -193,12 +193,12 @@ onBeforeMount(async () => {
 onBeforeUnmount(async () => {
   await roomOut(props.serverName, props.roomId);
 
-  conn.methodHandler(`room.in`)
-  conn.methodHandler(`room.exchangeOwner`)
-  conn.methodHandler(`room.out`)
-  conn.methodHandler(`room.message`)
-  conn.methodHandler(`room.close`)
-  conn.methodHandler(`room.forbidden`)
+  conn.methodHandler(`publish.room.notice.in`)
+  conn.methodHandler(`publish.room.notice.exchangeOwner`)
+  conn.methodHandler(`publish.room.notice.out`)
+  conn.methodHandler(`publish.room.message`)
+  conn.methodHandler(`publish.room.notice.close`)
+  conn.methodHandler(`publish.room.notice.forbidden`)
 })
 </script>
 

@@ -1,22 +1,39 @@
-import {Configs, Public, Services} from './public/public';
 import path from 'path';
-import {ipcMain} from "electron";
+import {app, ipcMain} from "electron";
 import os from 'os';
+import fs = require('fs');
+import {Configs, Logger} from "./public/public";
 
 // 注册主进程和渲染进程通信接口
 export function initialIPC(ipc: typeof ipcMain) {
-    ipc.handle("Public", (Event, method: string, ...args) => {
-        return Public.call(method, ...args);
+    ipc.handle("loadLocal", (Event, name: string) => {
+        const p = path.join(app.getPath('userData'), name + '.json');
+        try {
+            return fs.readFileSync(p, 'utf8');
+        } catch (e) {
+            return
+        }
     })
-    ipc.handle("Services", (Event, method: string, ...args) => {
-        return Services.call(method, ...args);
+
+    ipc.handle("saveLocal", (Event, name: string, data: string) => {
+        fs.writeFileSync(path.join(app.getPath('userData'), name + '.json'), data);
     })
-    ipc.handle("Configs", (Event, method: string, ...args) => {
-        return Configs.call(method, ...args);
+    ipc.handle("macAddress", (Event) => {
+        return getMacAddress();
+    })
+    ipc.handle("nat", (Event) => {})
+    ipc.handle("log", (Event, level: string, message: string) => {
+        Logger.log(level, message);
+    })
+    ipc.handle("getConfig", (Event, name: string) => {
+        return Configs.get(name);
+    })
+    ipc.handle("setConfig", (Event, name: string, value: any) => {
+        Configs.update(name, value);
     })
 }
 
-function getMacAddress(): string | undefined {
+function getMacAddress(): string {
     const networkInterfaces = os.networkInterfaces();
     for (const interfaceName in networkInterfaces) {
         const interfaces = networkInterfaces[interfaceName];
@@ -27,16 +44,9 @@ function getMacAddress(): string | undefined {
             }
         }
     }
-    return undefined;
+    return "";
 }
 
 export function initialize(ipc: typeof ipcMain) {
-    if (!Public.has("basedir")) {
-        Public.set("basedir", path.dirname(__dirname));
-    }
-    const macAddress = getMacAddress();
-    if (macAddress) {
-        Public.set("mac", macAddress);
-    }
     initialIPC(ipc);
 }

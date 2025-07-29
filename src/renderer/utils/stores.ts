@@ -1,16 +1,14 @@
 import {defineStore} from 'pinia';
 import {server} from "./publicType";
 
-function createElectronStore<T>(id: string) {
-    return defineStore(id, {
+export const Services =  defineStore('Services', {
         state: () => ({
-            originData: new Map<string, T>(),
-            initialed: false,
+            originData: new Map<string, server>(),
         }),
         getters: {
             get: state => {
-                return (key: string): T | undefined => {
-                    return state.originData.get(key) as T
+                return (key: string): server | undefined => {
+                    return state.originData.get(key)
                 };
             },
             has: state => {
@@ -19,52 +17,65 @@ function createElectronStore<T>(id: string) {
                 };
             },
             all: state => {
-                return Array.from(state.originData.entries()) as [string, T][]
+                return Array.from(state.originData.entries())
             },
 
         },
         actions: {
-            async delete(key: string) {
-                await window['electron'].invoke(id, 'delete', key);
+            delete(key: string) {
                 this.originData.delete(key);
 
             },
-            async set(key: string, value: T) {
-                await window['electron'].invoke(id, 'set', key, value);
+            set(key: string, value: server) {
                 this.originData.set(key, value);
             },
-            async pop(key: string): Promise<T> {
-                let svr: T = await window['electron'].invoke(id, 'pop', key)
+            pop(key: string): server {
+                let svr: server = this.originData.get(key);
                 this.originData.delete(key);
                 return svr;
             },
-            // 同步electron中的原数据，只需要执行一次，后续执行无效
-            async init(): Promise<void> {
-                if (this.initialed) {
-                    return
-                }
-                this.initialed = true;
-                const data: [string, T][] = await window['electron'].invoke(id, 'all');
-                for (let item of data) {
-                    this.originData.set(item[0], item[1]);
-                }
+            // 直接读取文件数据
+            load(): void {
+                window['electron'].invoke("loadLocal", 'Services').then((data: string) => {
+                    if (data === '' || data === undefined) {
+                        return
+                    }
+                    const elements: [key: string, value: server][] = JSON.parse(data);
+                    for (const key in elements) {
+                        this.originData.set(key, elements[key]);
+                    }
+                    this.originData = new Map<string, server>(elements);
+                });
+            },
+            // 保存数据到本地文件
+            save(): void {
+                window['electron'].invoke("saveLocal", 'Services', JSON.stringify(Array.from(this.originData))).then();
             }
         }
     })
+
+export const Configs = defineStore('Configs', {
+    state: () => ({
+
+    }),
+    actions: {
+        update(): void {
+
+        }
+    }
+})
+// 设备mac地址
+export let MacAddress: string = '';
+
+export function initStore() {
+    const svr = Services();
+    svr.load();
+    window['electron'].invoke('macAddress').then((address: string) => {
+        MacAddress = address;
+    })
 }
 
-/*pinia包装的对等electron服务器数据，原始数据存在于electron主进程中，
-增删改同步到源数据，持久化由electron负责，这个数据只是为了响应式
-* */
-export const Services = createElectronStore<server>('Services');
-export const Public = createElectronStore<any>('Public');
-export const Configs = createElectronStore<any>('Configs');
-
-export async function initStore() {
+export function saveStore() {
     const svr = Services();
-    const pub = Public();
-    const config = Configs();
-    await svr.init();
-    await pub.init();
-    await config.init();
+    svr.save();
 }

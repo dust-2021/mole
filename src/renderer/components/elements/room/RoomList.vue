@@ -27,6 +27,10 @@ const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
   info.value = await roomList(props.serverName, curPage.value, pageSize.value);
+  ElMessage({
+    type: 'success',
+    message: `获取到${info.value.total}个房间信息`
+  })
 }
 
 async function pageChange(v: number): Promise<void> {

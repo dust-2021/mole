@@ -1,6 +1,7 @@
 import {Logger, Configs} from "../public/public";
 import dgram = require('dgram')
 import {v4 as uuid} from 'uuid'
+import {Mutex} from "async-mutex";
 
 class NatCreator {
     private soc: dgram.Socket;
@@ -11,7 +12,7 @@ class NatCreator {
     private rooms: Map<string, string[]> = new Map();
 
     constructor() {
-        this.port = Configs.get("natPort", 8081);
+        this.port = Configs.natPort;
         this.soc = dgram.createSocket('udp4');
         this.slaveSoc = dgram.createSocket('udp4');
         this.soc.bind(this.port);

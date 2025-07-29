@@ -8,7 +8,7 @@
           </svg>
         </div>
         <div class="controls">
-          <el-button @click="handle('main-min')">
+          <el-button @click="ipcSend('main-min')">
             <el-icon :size="16">
               <Minus></Minus>
             </el-icon>
@@ -18,7 +18,7 @@
           <!--              <Crop></Crop>-->
           <!--            </el-icon>-->
           <!--          </el-button>-->
-          <el-button @click="handle('main-close')">
+          <el-button @click="shutdown">
             <el-icon :size="16">
               <Close></Close>
             </el-icon>
@@ -51,20 +51,13 @@ import {Close, Crop, Minus} from "@element-plus/icons-vue";
 import {ref} from "vue";
 import ServerItems from "./components/elements/server/ServerItems.vue";
 import {useRouter} from "vue-router";
-import {ipcSend, ipcOn} from "./utils/publicType";
-import {ElMessage} from 'element-plus'
+import {ipcSend} from "./utils/publicType";
+import {saveStore} from "./utils/stores";
 
-async function handle(msg: string): Promise<void> {
-  await ipcSend(msg);
+function shutdown() {
+  saveStore();
+  ipcSend('main-close').then(() => {})
 }
-
-ipcOn('msg', (msg: string, type: string) => {
-  ElMessage({
-    showClose: true,
-    message: msg,
-    type: type,
-  } as any)
-})
 
 let router = useRouter();
 let show = ref('');
