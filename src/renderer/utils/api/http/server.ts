@@ -33,7 +33,11 @@ export async function roomList(serverName: string, page: number = 1, size: numbe
             type: "error",
             message: `获取房间列表失败：${resp.message}`
         })
-        throw Error(resp.message)
+        return {total: 0, rooms: []};
     }
+    ElMessage({
+        type: 'success',
+        message: `获取到${resp.data.total}个房间信息`
+    })
     return resp.data;
 }

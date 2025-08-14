@@ -22,9 +22,12 @@ export type wsResp = {
 export async function ipcSend(msg: string) {
     await window['electron'].send(msg);
 }
+export async function ipcInvoke(key: string, ...args: any[]): Promise<any> {
+    return await window['electron'].invoke(key, ...args);
+}
 
 export function log(level: string, message?: string) {
-    window['electron'].send('log', level, message).then();
+    window['electron'].invoke('log', level, message).then();
 }
 
 // ipc事件监听

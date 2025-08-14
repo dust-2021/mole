@@ -27,15 +27,25 @@
       </div>
     </el-header>
 
-    <el-container style="height: 612px">
-      <el-aside width="80px" style="border-right: 1px solid #eee">
-        <IconButton icon="server" @click="toggleShow(`server`)"></IconButton>
-<!--        <IconButton icon="hall" @click="toggleShow(`hall`)"></IconButton>-->
-<!--        <IconButton icon="connectGame" @click="toggleShow(`connectGame`)"></IconButton>-->
-        <IconButton icon="setting" @click="toggleShow(`setting`)"></IconButton>
+    <el-container style="height: 612px;display: flex;justify-content: center;">
+      <el-aside width="80px" style="border-right: 1px solid #eee;justify-items: center">
+        <div class="icon-container">
+          <IconButton icon="server" @click="router.push('/server'); show = true" btn-size="large"></IconButton>
+        </div>
+        <div class="icon-container">
+          <IconButton icon="setting" @click="router.push('/setting'); show= true" btn-size="large"></IconButton>
+        </div>
       </el-aside>
-      <el-aside width="200px" style="border-right: 1px solid #eee" v-show="show !== ''">
-        <ServerItems v-show="show === `server`" :hideMiddle="hideMiddle"></ServerItems>
+      <!--      悬浮按钮-->
+      <el-button size="small" class="float-btn" @click="show = !show">
+        <el-icon>
+          <ArrowRight v-if="show"></ArrowRight>
+          <ArrowDown v-else></ArrowDown>
+        </el-icon>
+      </el-button>
+      <el-aside width="200px" style="border-right: 1px solid #eee" v-show="show">
+        <router-view name="middle">
+        </router-view>
       </el-aside>
       <el-main style="padding: 0;overflow: hidden;height: 100%">
         <router-view :key="$route.fullPath"></router-view>
@@ -47,33 +57,20 @@
 
 <script setup lang="ts">
 import IconButton from "./components/elements/IconButton.vue";
-import {Close, Crop, Minus} from "@element-plus/icons-vue";
-import {ref} from "vue";
-import ServerItems from "./components/elements/server/ServerItems.vue";
+import {Close, Minus, ArrowDown, ArrowRight} from "@element-plus/icons-vue";
 import {useRouter} from "vue-router";
 import {ipcSend} from "./utils/publicType";
 import {saveStore} from "./utils/stores";
+import {ref} from "vue";
 
 function shutdown() {
   saveStore();
-  ipcSend('main-close').then(() => {})
+  ipcSend('main-close').then(() => {
+  })
 }
 
 let router = useRouter();
-let show = ref('');
-
-function toggleShow(target: string) {
-  if (show.value === target) {
-    router.push('/');
-    show.value = '';
-    return;
-  }
-  show.value = target;
-}
-
-function hideMiddle() {
-  show.value = '';
-}
+const show = ref<boolean>(false);
 
 </script>
 
@@ -92,5 +89,23 @@ function hideMiddle() {
   border: none;
   cursor: pointer;
   margin: 0;
+}
+
+.icon-container {
+  margin-top: 5px;
+}
+
+.float-btn {
+  width: 28px;
+  height: 28px;
+  position: absolute;
+  top: 292px;
+  left: 66px;
+  transform: translateY(-50%);
+  background-color: lightgray;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
 }
 </style>

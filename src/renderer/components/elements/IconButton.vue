@@ -1,26 +1,41 @@
 <template>
-  <div style="margin: 5% 10%">
-    <el-button size="large" style="width:100%; border: 0">
-      <span style="width: 30%;height: 100%; margin-right: 20%"><svg width="24px" height="24px">
+    <el-button :size="props.btnSize" style="width:100%; border: 0">
+      <div class="center-style">
+        <span><svg :width="`${props.size}px`" :height="`${props.size}px`">
         <use :href="`#icon-${icon}`"/>
       </svg></span>
-      <span v-if="label" style="width: 70%;text-align: center; margin-left: 20%">{{ label }}</span>
-
+      </div>
+      <div class="center-style" v-if="label"><span style="text-align: center">{{ label }}</span></div>
     </el-button>
-  </div>
 </template>
 <script setup lang="ts">
+
+import {PropType} from "vue";
 
 const props = defineProps({
   icon: {
     type: String,
-    required: true
+    required: true,
+  },
+  size: {
+    type: Number,
+    default: 24,
   },
   label: {
     type: String
+  },
+  btnSize: {
+    type: String as PropType<'small' | 'medium' | 'large'>,
+    default: 'medium',
   }
 })
 </script>
 
 <style scoped>
+.center-style {
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 </style>

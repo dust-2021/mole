@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
-import {Services} from "../../../utils/stores";
-import {server, wsResp} from "../../../utils/publicType";
+import {Services} from "../../utils/stores";
+import {server, wsResp} from "../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import Message from "./Message.vue";
+import Message from "../elements/room/Message.vue";
 import {ArrowLeft, CopyDocument, Lock, Unlock} from '@element-plus/icons-vue'
-import SystemMessage from "./SystemMessage.vue";
-import {Connection} from "../../../utils/ws/conn";
-import {roomOut, roomMessage, roomForbidden, roomMates} from '../../../utils/api/ws/room'
+import SystemMessage from "../elements/room/SystemMessage.vue";
+import {Connection} from "../../utils/ws/conn";
+import {roomOut, roomMessage, roomForbidden, roomMates} from '../../utils/api/ws/room'
 import {Mutex} from 'async-mutex';
 
 const props = defineProps({
@@ -52,6 +52,10 @@ async function onMessage(resp: wsResp) {
   try {
     const data: { senderId: number, senderName: string, data: string, timestamp: number } = resp.data;
     messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
+    const k = messages.value.length;
+    if (k >= 1000 ) {
+      messages.value = messages.value.slice(k - 1001, 1000);
+    }
   } catch (error) {
   } finally {
     r();
@@ -114,11 +118,17 @@ function onLeaveRoom(resp: wsResp) {
 
 function onOwnerChange(resp: wsResp) {
   const data: { old: number, new: number } = resp.data;
-  const old = {...members.value.get(data.old), owner: false};
-  const new_ = {...members.value.get(data.new), owner: true};
+  const old_ = members.value.get(data.old);
+  const new_ = members.value.get(data.new);
+  if (old_ !== undefined) {
+    old_.owner = false;
+  }
+  if (new_ === undefined) {
+    return;
+  }
+  new_.owner = true;
   messages.value.push({from: 0, text: `房主已移交至${new_.username}`, timestamp: Date.now()});
-  members.value.set(data.old, old);
-  members.value.set(data.new, new_);
+
 }
 
 function onCloseRoom() {
@@ -133,7 +143,7 @@ function onForbiddenRoom(resp: wsResp) {
 }
 
 async function forbiddenRoom() {
-  if (!self.value.owner) {
+  if (!members.value.get(self.value.userId).owner) {
     ElMessage({
       message: '仅房主可用',
       type: 'warning'

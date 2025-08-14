@@ -1,5 +1,5 @@
 import {Services} from "../stores";
-import {wsReq, wsResp} from '../publicType'
+import {wsReq, wsResp, log} from '../publicType'
 import {ElMessage} from "element-plus";
 import {v4 as uuid} from "uuid";
 
@@ -28,20 +28,32 @@ export class Connection {
         }
         return ins;
     }
+    private static createConn(url: string) {
+        return new Promise<WebSocket>((resolve, reject) => {
+            const socket = new WebSocket(url);
+            socket.addEventListener("open", () => {
+                resolve(socket);
+            })
+            socket.addEventListener("error", (err) => {
+                reject(err);
+            })
+        })
+    }
 
-    public active() {
+    public async active(): Promise<boolean> {
         if (this.conn && this.conn.readyState === this.conn.OPEN) {
-            return;
+            return true;
         }
         const svr = Services().get(this.serverName);
         try {
-            this.conn = new WebSocket(`${svr.host}:${svr.port}/ws`);
+            this.conn = await Connection.createConn(`${svr.host}:${svr.port}/ws`);
         } catch (e) {
             ElMessage({
                 type: 'error',
-                message: `建立与${this.serverName}连接失败：${e}`
+                message: `连接服务器失败`
             })
-            return;
+            log('error', `create ws connection failed:${e.toString()}`)
+            return false;
         }
         this.conn.onmessage = this.handle.bind(this);
         this.conn.onerror = (event) => {
@@ -49,7 +61,7 @@ export class Connection {
         }
         this.conn.onclose = () => {
         }
-
+        return true;
     }
 
     public close() {

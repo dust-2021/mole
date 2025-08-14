@@ -51,7 +51,7 @@ async function submit() {
 
 <template>
   <div style="padding: 10px">
-    <el-form :model="formData" style="max-width: 60%;">
+    <el-form :model="formData" style="max-width: 60%;" label-width="auto">
       <el-form-item label="标题">
         <el-input :maxlength="12" v-model="formData.title" style="width: 240px"></el-input>
       </el-form-item>
@@ -71,8 +71,8 @@ async function submit() {
         <el-switch v-model="formData.autoClose"></el-switch>
       </el-form-item>
     </el-form>
+    <DangerButton box-text="创建" message="是否创建房间?" @success="submit"></DangerButton>
   </div>
-  <DangerButton box-text="创建" message="是否创建房间?" @success="submit"></DangerButton>
 </template>
 
 <style scoped>

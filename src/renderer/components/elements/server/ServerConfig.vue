@@ -51,7 +51,7 @@ const props = defineProps({
 async function add() {
   if (isNew.value) {
     svr.set(name.value, toRaw(newServer.value));
-    await router.push("/server/" + name.value);
+    await router.push("/server/page/" + name.value);
   }
 }
 
@@ -68,7 +68,10 @@ async function changeDefaultUser(u: user) {
   if (u.username === newServer.value.defaultUser.username) {
     return;
   }
-  await login(props.serverName,newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  const flag = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  if (!flag) {
+    return;
+  }
   newServer.value.defaultUser = u;
   ElMessage({
     type: 'success',
@@ -77,7 +80,10 @@ async function changeDefaultUser(u: user) {
 }
 
 async function reLogin() {
-  await login(props.serverName,newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  const flag = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  if (!flag) {
+    return;
+  }
   ElMessage({
     type: 'success',
     message: 'token已刷新'
@@ -126,7 +132,7 @@ onBeforeMount(() => {
         </el-input>
       </el-form-item>
       <el-form-item label="PORT">
-        <el-input v-model="newServer.port" type="number" placeholder="80" style="width: 100px"></el-input>
+        <el-input-number v-model="newServer.port" placeholder="80" :min="0" :max="2**16 -1"></el-input-number>
       </el-form-item>
       <el-form-item label="默认账号">
         <el-select :placeholder="newServer.defaultUser?.username"

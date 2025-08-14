@@ -2,35 +2,26 @@
 import {useRouter} from "vue-router";
 import {Services} from '../../../utils/stores'
 import ServerBand from "../server/ServerBand.vue";
-import {Plus, ArrowLeft} from '@element-plus/icons-vue'
+import {Plus, CirclePlus} from '@element-plus/icons-vue'
 
 const svr = Services();
 const router = useRouter();
-const props = defineProps({
-  hideMiddle: {
-    type: Function,
-  }
-})
 
 
 async function newServer(): Promise<void> {
-  await router.push('/addServer')
+  await router.push('/server/add')
 }
 </script>
 
 <template>
   <div style="height: 100%">
-    <div style="border-bottom: 1px #eee solid;">
-      <el-row :gutter="24" style="width: 100%;height: 100%">
-        <el-col :span="8" class="container">
-          <el-button  @click="newServer" class="btn">
-            <el-icon :size="24"><Plus></Plus></el-icon>
-          </el-button>
-        </el-col>
-        <el-col :span="8" class="container">
-          <el-button @click="props.hideMiddle" class="btn"><el-icon :size="24"><ArrowLeft></ArrowLeft></el-icon></el-button>
-        </el-col>
-      </el-row>
+    <div style="border-bottom: 1px #eee solid; display: flex; align-items: center; justify-content: center;">
+      <el-button @click="newServer" class="btn">
+        <el-icon :size="18">
+          <CirclePlus></CirclePlus>
+        </el-icon>
+        <span style="text-align: center;font-size: small;align-content: center">添加服务器</span>
+      </el-button>
     </div>
 
     <div style="height: 85%">
@@ -44,14 +35,9 @@ async function newServer(): Promise<void> {
 </template>
 
 <style scoped>
-.container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
 .btn {
-  margin: 5px;
-  border: 0;
-  border-radius: 30%;
+  height: 36px;
+  margin: 5px 5px 5px 10px;
+  border-radius: 5px;
 }
 </style>

@@ -1,7 +1,6 @@
 import {Logger, Configs} from "../public/public";
 import dgram = require('dgram')
 import {v4 as uuid} from 'uuid'
-import {Mutex} from "async-mutex";
 
 class NatCreator {
     private soc: dgram.Socket;
@@ -21,7 +20,7 @@ class NatCreator {
     }
 
     // udp监听处理函数
-    private async listener(message: Buffer, info: dgram.RemoteInfo) {
+    private listener(message: Buffer, info: dgram.RemoteInfo) {
         Logger.info(`Received message ${message} from ${info.address}:${info.port}`);
         const context = String(message);
         const result = context.split('\r\n')
@@ -33,10 +32,10 @@ class NatCreator {
                 break;
             case "punch":
                 this.soc.send(`punchSuccess\r\n${result[1]}`, info.port, info.address);
-                await this.heartbeat(info.address, info.port);
+                this.heartbeat(info.address, info.port);
                 break;
             case "punchSuccess":
-                await this.heartbeat(info.address, info.port);
+                this.heartbeat(info.address, info.port);
                 break;
             case "heartbeat":
                 // 心跳检测不作回应，双方心跳检测各自独立
@@ -45,38 +44,35 @@ class NatCreator {
     }
 
     // 完成nat连接后的心跳检测
-    private async heartbeat(addr: string, port: number): Promise<void> {
+    private heartbeat(addr: string, port: number): void {
         const id = setInterval(async () => {
             this.soc.send(`heartbeat`, port, addr, async (error, bytes) => {
                 if (error) {
-                    await this.disconnect(addr, port)
+                    this.disconnect(addr, port)
                 }
             });
         }, 2000)
         this.heartbeatTarget.set(`${addr}:${port}`, id);
     }
 
-    public async connect(address: string, port: number, key: string, roomId: string, retry: number = 0, maxRetry: number = 10,
-    ): Promise<void> {
-        if (retry > maxRetry) {
-            Logger.error(`Retry to connect to ${address}:${port} more than ${maxRetry}`);
-            return;
-        }
-        this.soc.send(Buffer.from(`punch\r\n${key}`), port, address, (error, bytes) => {
-            if (error) {
-                return this.connect(address, port, key, roomId, retry + 1);
-            }
-            if (roomId === "") {
-                throw new Error(`Room ${address} not found.`);
-            }
-            if (this.rooms.get(roomId) === null) {
-                this.rooms.set(roomId, []);
-            }
-            this.rooms.get(roomId)?.push(`${address}:${port}`);
-        })
+    public connect(address: string, port: number, key: string, roomId: string): void {
+        const call = setInterval( () => {
+            this.soc.send(Buffer.from(`punch\r\n${key}`), port, address, (error, bytes) => {
+                if (error) {
+                    Logger.debug("nat punch failed of " + `${address}:${port}`, error);
+                    return;
+                }
+                if (!this.rooms.has(roomId)) {
+                    this.rooms.set(roomId, []);
+                }
+                this.rooms.get(roomId)?.push(`${address}:${port}`);
+            })
+            call.close()
+        }, 500)
+
     }
 
-    public async disconnect(address: string, port: number): Promise<void> {
+    public disconnect(address: string, port: number): void {
         // 关闭心跳检测
         const id = this.heartbeatTarget.get(`${address}:${port}`);
         if (id) {
@@ -85,7 +81,7 @@ class NatCreator {
         this.heartbeatTarget.delete(`${address}:${port}`);
     }
 
-    public async disconnectRoom(roomId: string): Promise<void> {
+    public disconnectRoom(roomId: string): void {
         const room = this.rooms.get(roomId);
         if (!room) {
             return;
@@ -93,12 +89,12 @@ class NatCreator {
         for (const id in room) {
             const addr = id.split(':')[0];
             const port = parseInt(id.split(':')[1]);
-            await this.disconnect(addr, port);
+            this.disconnect(addr, port);
         }
         this.rooms.delete(roomId);
     }
 
-    public async stun(address: string, port: number): Promise<void> {
+    public stun(address: string, port: number): void {
         const key = uuid()
         // 与服务器约定的报文格式
         this.soc.send(`stun\r\n${key}`, port, address, (error, bytes) => {

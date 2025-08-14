@@ -27,10 +27,6 @@ const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
   info.value = await roomList(props.serverName, curPage.value, pageSize.value);
-  ElMessage({
-    type: 'success',
-    message: `获取到${info.value.total}个房间信息`
-  })
 }
 
 async function pageChange(v: number): Promise<void> {
@@ -75,7 +71,7 @@ function inputPassword(roomId: string): void {
         } as any)
         return
       }
-      router.push(`/room/page/${props.serverName}/${roomId}`)
+      router.push(`/server/room/page/${props.serverName}/${roomId}`)
     })
   })
 }
@@ -146,7 +142,7 @@ function inputPassword(roomId: string): void {
   <el-footer height="10%" style="justify-items: right;">
     <el-row :gutter="24" style="width: 100%">
       <el-col :span="4">
-        <el-button @click="$router.push(`/room/create/${props.serverName}`)" :type="'primary'">创建</el-button>
+        <el-button @click="$router.push(`/server/room/create/${props.serverName}`)" :type="'primary'">创建</el-button>
       </el-col>
       <el-col :span="4"></el-col>
       <el-col :span="16">

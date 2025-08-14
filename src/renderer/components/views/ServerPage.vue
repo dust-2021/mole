@@ -8,7 +8,7 @@ import ServerAdmin from "../elements/server/ServerAdmin.vue";
 import {Token} from "../../utils/token"
 
 const props = defineProps({
-  name: {
+  serverName: {
     type: String,
     required: true,
   }
@@ -16,13 +16,14 @@ const props = defineProps({
 let isMounted = ref(false);
 let svr = ref<server>(null);
 const services = Services();
+
 const isAdmin = computed(() => {
   const token = new Token(svr.value.token);
   return token.admin;
 })
 
 onBeforeMount(async () => {
-  svr.value = services.get(props.name);
+  svr.value = services.get(props.serverName);
   isMounted.value = true;
 });
 
@@ -32,13 +33,13 @@ onBeforeMount(async () => {
   <div style="height: 100%" v-if="isMounted">
     <el-tabs style="height: 100%; padding: 0 2%">
       <el-tab-pane label="首页" style="height: 100%">
-        <RoomList :server-name="props.name"></RoomList>
+        <RoomList :server-name="props.serverName"></RoomList>
       </el-tab-pane>
       <el-tab-pane label="管理" v-if="false">
-        <ServerAdmin :server-name="props.name"></ServerAdmin>
+        <ServerAdmin :server-name="props.serverName"></ServerAdmin>
       </el-tab-pane>
       <el-tab-pane label="设置">
-        <ServerConfig :server-name="props.name"></ServerConfig>
+        <ServerConfig :server-name="props.serverName"></ServerConfig>
       </el-tab-pane>
     </el-tabs>
 

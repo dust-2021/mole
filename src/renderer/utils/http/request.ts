@@ -1,6 +1,6 @@
-import {HttpResp} from "../publicType"
+import {HttpResp, log} from "../publicType"
 import {Services} from '../stores'
-import axios, {AxiosHeaders, AxiosResponse} from "axios";
+import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
 import {ElMessage} from "element-plus";
 
 // 参数格式化为请求路由参数
@@ -24,15 +24,14 @@ export async function fetch(serverName: string, method: string, url: string, wit
     if (withToken && svr.token) {
         headers.set("Token", svr.token);
     }
+    let body: AxiosRequestConfig = {
+        headers: headers, validateStatus: (status) => true, method: method.toUpperCase(),
+    }
     let resp: AxiosResponse | null = null;
     switch (method) {
         case "get":
             const queryString = (data === undefined || data === null) ? "" : queryFormatter(data);
-            resp = await axios.get(`${host}/${url}${queryString}`, {
-                headers: headers,
-                validateStatus: (status) => true
-            })
-
+            body.url = `${host}/${url}${queryString}`;
             break;
         case "post":
             let query: string = "";
@@ -40,22 +39,31 @@ export async function fetch(serverName: string, method: string, url: string, wit
                 const obj = Object.fromEntries(data);
                 query = JSON.stringify(obj);
             }
-            resp = await axios.post(`${host}/${url}`, query, {
-                headers: headers,
-                validateStatus: (status) => true
-            })
+            body.url = `${host}/${url}`;
+            body.data = query;
             break;
         default:
             throw new Error("Unknown method");
     }
-    if (resp.status !== 200) {
-        ElMessage({
-            type: "error",
-            message: `请求失败 ${resp.status}, Status: ${resp.statusText}`
-        })
-        throw Error(resp.statusText);
+    try {
+        resp = await axios.request(body);
+        // // token失效时重新获取
+        // if (resp.status === 403 || resp.status === 401) {
+        //     const r = await axios.post(`${host}/api/login`, JSON.stringify({
+        //         username: svr.defaultUser.username,
+        //         password: svr.defaultUser.password
+        //     }));
+        //     svr.token = resp.data.data;
+        //     body.headers["Token"] = svr.token;
+        //     resp = await axios.request(body);
+        // }
+        return resp.data;
+    } catch (e) {
+        log('error', e.toString());
+        return {
+            code: -1, message: `请求失败 ${e}`
+        }
     }
-    return resp.data;
 }
 
 

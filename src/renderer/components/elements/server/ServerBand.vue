@@ -35,7 +35,11 @@ async function activeCon() {
     connected.value = 0;
   } else {
     connected.value = 1;
-    conn.active();
+    // 连接失败
+    if (!(await conn.active())){
+      connected.value = 0;
+      return;
+    }
     await new Promise(resolve => setTimeout(resolve, 500));
     pingTask();
     await auth(props.serverName);
@@ -83,7 +87,7 @@ onBeforeUnmount(() => {
 <template>
   <el-row class="hover-box">
     <el-col :span="16">
-      <el-button style="width: 80%" @click="router.push(`/server/${serverName}`);">
+      <el-button style="width: 80%" @click="router.push(`/server/page/${serverName}`);">
         {{ serverName.length <= 5 ? serverName : serverName.substring(0, 5) + '...' }}
       </el-button>
     </el-col>

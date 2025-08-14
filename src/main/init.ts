@@ -3,6 +3,7 @@ import {app, ipcMain} from "electron";
 import os from 'os';
 import fs = require('fs');
 import {Configs, Logger} from "./public/public";
+import {natHandler} from "./ws/nat";
 
 // 注册主进程和渲染进程通信接口
 export function initialIPC(ipc: typeof ipcMain) {
