@@ -4,9 +4,6 @@ import {ipcInvoke} from "../../../utils/publicType";
 
 const natPort = ref(8080);
 const logLevel = ref<string>('info');
-watch(natPort, (newVal, oldVal) => {
-  ipcInvoke('setConfig', '', newVal);
-})
 
 async function save(key: string, value: any) {
   await ipcInvoke("setConfig", key, value);

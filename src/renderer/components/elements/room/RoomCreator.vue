@@ -44,7 +44,7 @@ async function submit() {
       return
     }
     const roomId: string = r.data;
-    router.push(`/room/page/${props.serverName}/${roomId}`);
+    router.push(`/server/room/page/${props.serverName}/${roomId}`);
   })
 }
 </script>

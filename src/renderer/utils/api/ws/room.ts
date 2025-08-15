@@ -16,8 +16,8 @@ export async function roomMessage(server: string, roomId: string, msg: string, h
     await wsRequest(server, 'room.message', [roomId, msg], handle);
 }
 
-export async function roomForbidden(server: string, roomId: string, handle?: wsHandleFunc) {
-    await wsRequest(server, 'room.forbidden', [roomId], handle);
+export async function roomForbidden(server: string, roomId: string, to: boolean, handle?: wsHandleFunc) {
+    await wsRequest(server, 'room.forbidden', [roomId, to], handle);
 }
 
 export async function roomMates(server: string, roomId: string, handle?: wsHandleFunc) {

@@ -1,4 +1,4 @@
-import {HttpResp, log} from "../publicType"
+import {HttpResp, log, server} from "../publicType"
 import {Services} from '../stores'
 import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
 import {ElMessage} from "element-plus";
@@ -47,16 +47,12 @@ export async function fetch(serverName: string, method: string, url: string, wit
     }
     try {
         resp = await axios.request(body);
-        // // token失效时重新获取
-        // if (resp.status === 403 || resp.status === 401) {
-        //     const r = await axios.post(`${host}/api/login`, JSON.stringify({
-        //         username: svr.defaultUser.username,
-        //         password: svr.defaultUser.password
-        //     }));
-        //     svr.token = resp.data.data;
-        //     body.headers["Token"] = svr.token;
-        //     resp = await axios.request(body);
-        // }
+        // token失效时重新获取
+        if (resp.status === 403 || resp.status === 401) {
+            resp = await refreshTokenDo(svr, host, body);
+        }
+        const result = resp.data as HttpResp;
+        log(result.code === 0 ? 'info' : 'error', `${serverName} | ${url} | ${method} | ${result.code === 0 ? 'success' : result.message}`);
         return resp.data;
     } catch (e) {
         log('error', e.toString());
@@ -64,6 +60,20 @@ export async function fetch(serverName: string, method: string, url: string, wit
             code: -1, message: `请求失败 ${e}`
         }
     }
+}
+
+// 刷新token并再次发起请求
+async function refreshTokenDo(svr: server, host: string, body: AxiosRequestConfig): Promise<AxiosResponse> {
+        const r = await axios.post(`${host}/api/login`, JSON.stringify({
+            username: svr.defaultUser.username,
+            password: svr.defaultUser.password
+        }));
+        if (r.status !== 200 || r.data.code !== 0) {
+            throw new AxiosError("refresh token failed");
+        }
+        svr.token = r.data.data;
+        body.headers["Token"] = svr.token;
+        return await axios.request(body);
 }
 
 

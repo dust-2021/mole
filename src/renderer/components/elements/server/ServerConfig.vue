@@ -65,13 +65,18 @@ async function remove() {
 
 // 选项卡切换默认账号时重新登录并修改
 async function changeDefaultUser(u: user) {
-  if (u.username === newServer.value.defaultUser.username) {
+  if (newServer.value.defaultUser && u.username === newServer.value.defaultUser.username) {
     return;
   }
-  const flag = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
-  if (!flag) {
+  const token: string | null = await login(props.serverName, u.username, u.password);
+  if (token === null) {
+    ElMessage({
+      type: 'error',
+      message: '切换账号失败！',
+    })
     return;
   }
+  newServer.value.token = token;
   newServer.value.defaultUser = u;
   ElMessage({
     type: 'success',
@@ -80,10 +85,15 @@ async function changeDefaultUser(u: user) {
 }
 
 async function reLogin() {
-  const flag = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
-  if (!flag) {
+  const token = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  if (token === null) {
+    ElMessage({
+      type: 'error',
+      message: 'token刷新失败'
+    })
     return;
   }
+  newServer.value.token = token;
   ElMessage({
     type: 'success',
     message: 'token已刷新'

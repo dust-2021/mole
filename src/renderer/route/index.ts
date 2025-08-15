@@ -10,7 +10,6 @@ import ServerItems from "../components/elements/server/ServerItems.vue";
 const routes = [
     {
         path: "/server",
-        // components: {middle: ServerItems, default: Empty},
         children: [
             {path: '', components: {middle: ServerItems}},
             {path: 'add', components: {default: ServerConfig, middle: ServerItems}, props: true},

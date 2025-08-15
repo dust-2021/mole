@@ -2,7 +2,7 @@ import {wsRequest, wsHandleFunc, Connection} from '../../ws/conn'
 import {wsResp} from "../../publicType";
 import {ElMessage} from "element-plus";
 
-// 订阅频道，handle是频道消息处理而非订阅结果处理
+// 订阅频道，handle是订阅成功后对频道消息的处理而非订阅结果处理
 export async function subscribe(server: string, channel: string, handle?: wsHandleFunc) {
     await wsRequest(server, 'channel.subscribe', [channel], (r: wsResp) =>{
         if (r.statusCode !== 0) {

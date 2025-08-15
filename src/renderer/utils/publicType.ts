@@ -15,7 +15,7 @@ export type wsResp = {
     id: string;
     method: string;
     statusCode: number;
-    data: any;
+    data: any; // statusCode不为0时，data是string类型的错误信息
 };
 
 // 发送ipc信号

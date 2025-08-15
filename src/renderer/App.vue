@@ -44,7 +44,8 @@
         </el-icon>
       </el-button>
       <el-aside width="200px" style="border-right: 1px solid #eee" v-show="show">
-        <router-view name="middle">
+        <router-view name="middle" v-slot="{Component}">
+          <keep-alive><component :is="Component"></component></keep-alive>
         </router-view>
       </el-aside>
       <el-main style="padding: 0;overflow: hidden;height: 100%">
@@ -99,9 +100,9 @@ const show = ref<boolean>(false);
   width: 28px;
   height: 28px;
   position: absolute;
-  top: 292px;
-  left: 66px;
-  transform: translateY(-50%);
+  top: 50%;
+  left: 80px;
+  transform: translate(-50%, -50%);
   background-color: lightgray;
   color: white;
   border: none;

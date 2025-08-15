@@ -9,6 +9,7 @@ import {subscribe, unsubscribe} from "../../../utils/api/ws/channel";
 import {login} from '../../../utils/api/http/user'
 import {auth} from '../../../utils/api/ws/base'
 import {Connection as wsConn} from "../../../utils/ws/conn";
+import {Services} from '../../../utils/stores'
 
 const router = useRouter()
 const props = defineProps({
@@ -38,20 +39,16 @@ async function activeCon() {
     // 连接失败
     if (!(await conn.active())){
       connected.value = 0;
+      ElMessage({
+        type: 'error',
+        message: '连接服务器失败'
+      })
       return;
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
     pingTask();
     await auth(props.serverName);
     connected.value = 2;
   }
-  // if (!flag) {
-  //   ElMessage({
-  //     type: "warning",
-  //     message: "连接异常",
-  //     showClose: true,
-  //   })
-  // }
 }
 
 // 订阅服务器时间事件
@@ -70,8 +67,12 @@ function pingTask() {
 }
 
 onBeforeMount(() => {
-  login(props.serverName, props.curServer.defaultUser?.username, props.curServer.defaultUser?.password).then();
-
+  login(props.serverName, props.curServer.defaultUser?.username, props.curServer.defaultUser?.password).then((resp: string | null) => {
+    if (resp !== null) {
+      const svr = Services().get(props.serverName);
+      svr.token = resp;
+    }
+  });
 });
 
 onBeforeUnmount(() => {

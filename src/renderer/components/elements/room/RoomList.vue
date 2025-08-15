@@ -26,7 +26,19 @@ const svr = ref<server>(null);
 const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
-  info.value = await roomList(props.serverName, curPage.value, pageSize.value);
+  const resp: { total: number, rooms: roomInfo[] } | null = await roomList(props.serverName, curPage.value, pageSize.value);
+  if (resp === null) {
+    ElMessage({
+      type: "error",
+      message: "获取房间失败"
+    })
+    return;
+  }
+  info.value = resp;
+  ElMessage({
+    type: "success",
+    message: `获取到${resp.total}个房间信息`
+  })
 }
 
 async function pageChange(v: number): Promise<void> {

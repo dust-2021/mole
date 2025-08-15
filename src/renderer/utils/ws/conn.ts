@@ -48,10 +48,6 @@ export class Connection {
         try {
             this.conn = await Connection.createConn(`${svr.host}:${svr.port}/ws`);
         } catch (e) {
-            ElMessage({
-                type: 'error',
-                message: `连接服务器失败`
-            })
             log('error', `create ws connection failed:${e.toString()}`)
             return false;
         }

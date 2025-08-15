@@ -10,6 +10,7 @@ import SystemMessage from "../elements/room/SystemMessage.vue";
 import {Connection} from "../../utils/ws/conn";
 import {roomOut, roomMessage, roomForbidden, roomMates} from '../../utils/api/ws/room'
 import {Mutex} from 'async-mutex';
+import IconButton from "../elements/IconButton.vue";
 
 const props = defineProps({
   serverName: {
@@ -53,7 +54,7 @@ async function onMessage(resp: wsResp) {
     const data: { senderId: number, senderName: string, data: string, timestamp: number } = resp.data;
     messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
     const k = messages.value.length;
-    if (k >= 1000 ) {
+    if (k >= 1000) {
       messages.value = messages.value.slice(k - 1001, 1000);
     }
   } catch (error) {
@@ -150,11 +151,11 @@ async function forbiddenRoom() {
     })
     return;
   }
-  await roomForbidden(props.serverName, props.roomId, (resp: wsResp) => {
-    if (resp.statusCode === 0) {
-      forbidden.value = !forbidden.value;
-      messages.value.push({
-        from: 0, text: forbidden.value ? '房间关闭进入' : '房间开放进入', timestamp: Date.now()
+  await roomForbidden(props.serverName, props.roomId, !forbidden.value, (resp: wsResp) => {
+    if (resp.statusCode !== 0)  {
+      ElMessage({
+        type: 'warning',
+        message: `关闭房间失败：${resp.data}`
       })
     }
   });
@@ -218,27 +219,20 @@ onBeforeUnmount(async () => {
       <el-col :span="6" style="height: 100%;border-right: 1px solid #eee;">
         <div style="margin-bottom: 1px">
           <el-row :gutter="24">
-            <el-col :span="8" class="room-btn">
-              <el-button class="item-btn">
-                <el-icon :size="18" @click="$router.push('/')">
-                  <ArrowLeft></ArrowLeft>
-                </el-icon>
-              </el-button>
+            <el-col :span="8">
+              <div class="room-btn"><IconButton :size="24" icon="leaveRoom" @click="router.go(-1)"></IconButton></div>
+
             </el-col>
-            <el-col :span="8" class="room-btn">
-              <el-button class="item-btn">
-                <el-icon :size="18" @click="forbiddenRoom">
-                  <Lock v-if="forbidden"></Lock>
-                  <Unlock v-else></Unlock>
-                </el-icon>
-              </el-button>
+            <el-col :span="8">
+              <div class="room-btn">
+              <IconButton icon="unlock" :size="24" @click="forbiddenRoom" v-if="forbidden"></IconButton>
+              <IconButton icon="lock" :size="24" @click="forbiddenRoom" v-else></IconButton>
+              </div>
             </el-col>
-            <el-col :span="8" class="room-btn">
-              <el-button class="item-btn">
-                <el-icon @click="copyRoomId(props.roomId)" :size="18">
-                  <CopyDocument></CopyDocument>
-                </el-icon>
-              </el-button>
+            <el-col :span="8">
+              <div class="room-btn">
+              <IconButton icon="copy" :size="24" @click="copyRoomId(props.roomId)"></IconButton>
+              </div>
             </el-col>
           </el-row>
         </div>
@@ -254,10 +248,14 @@ onBeforeUnmount(async () => {
               <el-col :span="14">
                 <el-row :gutter="24">
                   <el-col :span="16">
-                    <el-text :type="'primary'">{{ k[1].username }}</el-text>
+                    <el-text :type="'primary'" :truncated="true">{{ k[1].username }}</el-text>
                   </el-col>
-                  <el-col :span="8">
-                    <el-tag v-if="k[1].owner" size="small">房主</el-tag>
+                  <el-col :span="8" v-if="k[1].owner">
+                    <div style="display: flex;justify-items: center;align-content: center">
+                      <svg :width="'16px'" :height="'16px'">
+                        <use href="#icon-badge"></use>
+                      </svg>
+                    </div>
                   </el-col>
                 </el-row>
               </el-col>
@@ -308,14 +306,9 @@ onBeforeUnmount(async () => {
   display: flex;
   justify-content: center;
   align-items: center;
+  margin: auto;
+  padding: 5px;
 }
-
-.item-btn {
-  margin: 5px;
-  border: 0;
-  border-radius: 20%;
-}
-
 .center-item {
   display: flex;
   justify-items: center;
