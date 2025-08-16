@@ -11,7 +11,7 @@ async function save(key: string, value: any) {
 </script>
 
 <template>
-  <div>
+  <div style="padding: 10px">
     <el-form label-width="auto" style="max-width: 80%;">
       <el-form-item label="NAT端口">
         <el-input-number @change="save('port', natPort)" v-model="natPort" :max="2 ** 16 -1" :min="3000"/>

@@ -37,7 +37,7 @@ async function activeCon() {
   } else {
     connected.value = 1;
     // 连接失败
-    if (!(await conn.active())){
+    if (!(await conn.active())) {
       connected.value = 0;
       ElMessage({
         type: 'error',
@@ -61,7 +61,7 @@ function pingTask() {
       })
       return
     }
-    const data: {timestamp: number} = resp.data;
+    const data: { timestamp: number } = resp.data;
     ping.value = Date.now() - data.timestamp;
   })
 }
@@ -88,45 +88,54 @@ onBeforeUnmount(() => {
 <template>
   <el-row class="hover-box">
     <el-col :span="16">
-      <el-button style="width: 80%" @click="router.push(`/server/page/${serverName}`);">
-        {{ serverName.length <= 5 ? serverName : serverName.substring(0, 5) + '...' }}
-      </el-button>
+      <div class="container" @click="router.push(`/server/page/${serverName}`);">
+        <el-text :truncated="true">{{ serverName }}</el-text>
+      </div>
     </el-col>
     <el-col :span="8">
-      <el-button :class="{'connected-box': connected === 2, 'disconnected-box': connected !== 2}"
-                  @click="activeCon()" v-if="curServer.defaultUser" :disabled="connected === 1"
-                 style="width: 80%"
-      >
-        <el-icon :size="16" v-if="connected === 0">
-          <Connection></Connection>
-        </el-icon>
-        <el-icon :size="16" class="is-loading" v-else-if="connected === 1">
-          <Loading></Loading>
-        </el-icon>
-        <el-text :type="ping > 100 ? 'warning': 'info'" :truncated="true" v-else>{{ping}}</el-text>
-      </el-button>
+      <div class="container">
+        <el-button :class="{'connected-box': connected === 2, 'disconnected-box': connected !== 2}"
+                   @click="activeCon()" v-if="curServer.defaultUser" :disabled="connected === 1"
+                   style="width: 80%"
+        >
+          <el-icon :size="16" v-if="connected === 0">
+            <Connection></Connection>
+          </el-icon>
+          <el-icon :size="16" class="is-loading" v-else-if="connected === 1">
+            <Loading></Loading>
+          </el-icon>
+          <el-text :type="ping > 100 ? 'warning': 'info'" :truncated="true" v-else>{{ ping }}</el-text>
+        </el-button>
+      </div>
     </el-col>
   </el-row>
 </template>
 
 <style scoped>
 .hover-box {
-  text-align: center;
+  height: 40px;
   cursor: pointer;
   transition: background-color 0.3s;
-  padding: 5px;
   border-bottom: 1px #eee solid;
 }
 
 .hover-box:hover {
   background-color: #eee;
 }
+
 .connected-box {
   border-color: lightgreen;
   background-color: white;
 }
+
 .disconnected-box {
   border: 0;
   background-color: lightgray;
+}
+
+.container {
+  justify-items: center;
+  align-content: center;
+  height: 100%;
 }
 </style>

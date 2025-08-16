@@ -60,7 +60,7 @@ async function remove() {
     return;
   }
   svr.delete(props.serverName);
-  await router.push("/");
+  await router.push("/server");
 }
 
 // 选项卡切换默认账号时重新登录并修改

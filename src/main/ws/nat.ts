@@ -1,6 +1,7 @@
 import {Logger, Configs} from "../public/public";
 import dgram = require('dgram')
-import {v4 as uuid} from 'uuid'
+import {v4 as uuid} from 'uuid';
+import {Mutex} from 'async-mutex';
 
 class NatCreator {
     private soc: dgram.Socket;
@@ -9,6 +10,7 @@ class NatCreator {
     public symmetry = false;
     private heartbeatTarget: Map<string, NodeJS.Timeout> = new Map();
     private rooms: Map<string, string[]> = new Map();
+    private roomsLock: Mutex = new Mutex();
 
     constructor() {
         this.port = Configs.natPort;
