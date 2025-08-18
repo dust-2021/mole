@@ -22,6 +22,7 @@ export type wsResp = {
 export async function ipcSend(msg: string) {
     await window['electron'].send(msg);
 }
+
 export async function ipcInvoke(key: string, ...args: any[]): Promise<any> {
     return await window['electron'].invoke(key, ...args);
 }
@@ -54,6 +55,7 @@ export type user = {
 export type server = {
     host: string;
     port: number;
+    certify: boolean;
     users: user[];
     defaultUser?: user;
     token?: string;

@@ -7,10 +7,10 @@ class NatCreator {
     private soc: dgram.Socket;
     private slaveSoc: dgram.Socket;
     private readonly port: number;
-    public symmetry = false;
+
     private heartbeatTarget: Map<string, NodeJS.Timeout> = new Map();
     private rooms: Map<string, string[]> = new Map();
-    private roomsLock: Mutex = new Mutex();
+    private lock: Mutex = new Mutex();
 
     constructor() {
         this.port = Configs.natPort;
@@ -28,16 +28,12 @@ class NatCreator {
         const result = context.split('\r\n')
         const type_ = result[0];
         switch (type_) {
-            case "stun":
-                // 约定格式："stun\r\n{bool}"，代表主soc和从soc在nat网络中是否为同一端口
-                this.symmetry = !Boolean(result[1]);
-                break;
             case "punch":
                 this.soc.send(`punchSuccess\r\n${result[1]}`, info.port, info.address);
-                this.heartbeat(info.address, info.port);
+                this.heartbeat(info.address, info.port).then();
                 break;
             case "punchSuccess":
-                this.heartbeat(info.address, info.port);
+                this.heartbeat(info.address, info.port).then();
                 break;
             case "heartbeat":
                 // 心跳检测不作回应，双方心跳检测各自独立
@@ -46,7 +42,7 @@ class NatCreator {
     }
 
     // 完成nat连接后的心跳检测
-    private heartbeat(addr: string, port: number): void {
+    private async heartbeat(addr: string, port: number): Promise<void> {
         const id = setInterval(async () => {
             this.soc.send(`heartbeat`, port, addr, async (error, bytes) => {
                 if (error) {
@@ -54,11 +50,17 @@ class NatCreator {
                 }
             });
         }, 2000)
-        this.heartbeatTarget.set(`${addr}:${port}`, id);
+        const release = await this.lock.acquire();
+        try {
+            this.heartbeatTarget.set(`${addr}:${port}`, id);
+        } catch (error) {
+        } finally {
+            release();
+        }
     }
 
     public connect(address: string, port: number, key: string, roomId: string): void {
-        const call = setInterval( () => {
+        const call = setInterval(() => {
             this.soc.send(Buffer.from(`punch\r\n${key}`), port, address, (error, bytes) => {
                 if (error) {
                     Logger.debug("nat punch failed of " + `${address}:${port}`, error);
@@ -95,22 +97,13 @@ class NatCreator {
         }
         this.rooms.delete(roomId);
     }
-
-    public stun(address: string, port: number): void {
-        const key = uuid()
-        // 与服务器约定的报文格式
-        this.soc.send(`stun\r\n${key}`, port, address, (error, bytes) => {
-            if (error) {
-                Logger.error(`stun failed: ${error}`);
-            }
-        });
-
-        this.slaveSoc.send(`stunSlave\r\n${key}`, port, address, (error, bytes) => {
-            if (error) {
-                Logger.error(`stun slave failed: ${error}`);
-            }
-        });
-    }
 }
 
 export const natHandler = new NatCreator();
+
+
+export function handleIPC(method: string, ...args: any[]): any {
+    switch (method) {
+
+    }
+}

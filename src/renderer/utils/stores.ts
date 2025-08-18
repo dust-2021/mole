@@ -53,17 +53,6 @@ export const Services =  defineStore('Services', {
             }
         }
     })
-
-export const Configs = defineStore('Configs', {
-    state: () => ({
-
-    }),
-    actions: {
-        update(): void {
-
-        }
-    }
-})
 // 设备mac地址
 export let MacAddress: string = '';
 

@@ -2,16 +2,19 @@ import {Services} from "../stores";
 import {wsReq, wsResp, log} from '../publicType'
 import {ElMessage} from "element-plus";
 import {v4 as uuid} from "uuid";
-
+import {AsyncMap, RWLock} from '../asynchronous'
 
 // ws响应处理函数类型，传入当前服务器ws连接类和ws报文
 export type wsHandleFunc = (resp: wsResp) => any;
 
+/* ws连接管理，每个服务器名会生成一个连接单例
+* */
 export class Connection {
     static All: Map<string, Connection> = new Map();
     private conn: WebSocket = null;
-    private handleByMethod = new Map<string, wsHandleFunc>();
-    private handleById = new Map<string, wsHandleFunc>();
+    private readonly lock = new RWLock();
+    private handleByMethod = new AsyncMap<wsHandleFunc>(this.lock);
+    private handleById = new AsyncMap<wsHandleFunc>(this.lock);
 
     private constructor(public serverName: string) {
         const s = Services();
@@ -28,6 +31,7 @@ export class Connection {
         }
         return ins;
     }
+
     private static createConn(url: string) {
         return new Promise<WebSocket>((resolve, reject) => {
             const socket = new WebSocket(url);
@@ -41,14 +45,17 @@ export class Connection {
     }
 
     public async active(): Promise<boolean> {
+        const release = await this.lock.acquireWrite();
         if (this.conn && this.conn.readyState === this.conn.OPEN) {
+            release();
             return true;
         }
         const svr = Services().get(this.serverName);
         try {
-            this.conn = await Connection.createConn(`${svr.host}:${svr.port}/ws`);
+            this.conn = await Connection.createConn(`${svr.certify ? 'https://' : 'http://'}${svr.host}:${svr.port}/ws`);
         } catch (e) {
             log('error', `create ws connection failed:${e.toString()}`)
+            release();
             return false;
         }
         this.conn.onmessage = this.handle.bind(this);
@@ -56,18 +63,23 @@ export class Connection {
             // Logger.error("wsError:" + event.message)
         }
         this.conn.onclose = () => {
+            log('info', 'connection closed');
         }
+        release();
         return true;
     }
 
     public close() {
         if (this.conn && this.conn.readyState === this.conn.OPEN) {
+            const release = this.lock.acquireWrite();
             this.conn.close();
+            release.then(this.conn = null);
+            return;
         }
         this.conn = null;
     }
 
-    private handle(event: MessageEvent): void {
+    private async handle(event: MessageEvent): Promise<void> {
         if (this.conn === null || this.conn.readyState !== this.conn.OPEN) {
             return;
         }
@@ -85,16 +97,16 @@ export class Connection {
         let f: wsHandleFunc;
         try {
             // 响应服务器消息
-            if (this.handleByMethod.has(r.method)) {
-                f = this.handleByMethod.get(r.method);
-            } else if (this.handleById.has(r.id)) {
-                f = this.handleById.get(r.id);
+            if (await this.handleByMethod.has(r.method)) {
+                f = await this.handleByMethod.get(r.method);
+            } else if (await this.handleById.has(r.id)) {
+                f = await this.handleById.get(r.id);
             }
             f?.(r);
         } catch (e) {
             console.error(e);
         } finally {
-            this.handleById.delete(r.id);
+            await this.handleById.delete(r.id);
         }
     }
 
@@ -109,16 +121,16 @@ export class Connection {
         }
         this.conn.send(JSON.stringify(msg));
         if (handle) {
-            this.handleById.set(msg.id, handle);
+            await this.handleById.set(msg.id, handle);
         }
     }
 
     // 添加或删除ws处理函数
     public methodHandler(key: string, handler?: wsHandleFunc): void {
         if (handler) {
-            this.handleByMethod.set(key, handler);
+            this.handleByMethod.set(key, handler).then();
         } else {
-            this.handleByMethod.delete(key);
+            this.handleByMethod.delete(key).then();
         }
     }
 }

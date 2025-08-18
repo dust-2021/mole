@@ -1,7 +1,6 @@
 import {HttpResp, log, server} from "../publicType"
 import {Services} from '../stores'
 import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
-import {ElMessage} from "element-plus";
 
 // 参数格式化为请求路由参数
 function queryFormatter(data: Map<string, any>): string {
@@ -18,7 +17,7 @@ function queryFormatter(data: Map<string, any>): string {
 * */
 export async function fetch(serverName: string, method: string, url: string, withToken: boolean, data?: Map<string, any>): Promise<HttpResp> {
     const svr = Services().get(serverName);
-    const host = `${svr.host}:${svr.port}`;
+    const host = `${svr.certify? 'https://': 'http://'}${svr.host}:${svr.port}`;
     const headers = new AxiosHeaders();
     headers.set("Accept", "application/json");
     if (withToken && svr.token) {

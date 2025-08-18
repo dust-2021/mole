@@ -46,8 +46,18 @@ async function activeCon() {
       return;
     }
     pingTask();
-    await auth(props.serverName);
-    connected.value = 2;
+    await auth(props.serverName,  (resp) => {
+      if (resp.statusCode !== 0) {
+        conn.close();
+        connected.value = 0;
+        ElMessage({
+          type: 'error',
+          message: resp.statusCode === 10201 ? '该账号已连接':'认证失败，连接已断开',
+        })
+      } else {
+        connected.value = 2;
+      }
+    });
   }
 }
 
@@ -88,8 +98,10 @@ onBeforeUnmount(() => {
 <template>
   <el-row class="hover-box">
     <el-col :span="16">
-      <div class="container" @click="router.push(`/server/page/${serverName}`);">
-        <el-text :truncated="true">{{ serverName }}</el-text>
+      <div class="container" style="padding-left: 5%;padding-right: 5%" @click="router.push(`/server/page/${serverName}`);">
+        <el-text :truncated="true" type="primary">
+          {{ serverName }}
+        </el-text>
       </div>
     </el-col>
     <el-col :span="8">

@@ -123,7 +123,7 @@ onBeforeMount(() => {
     newServer.value = svr.get(props.serverName);
   } else {
     isNew.value = true;
-    newServer.value = {host: "", port: 80, users: []};
+    newServer.value = {certify: false, host: "", port: 80, users: []};
   }
   mounted.value = true;
 })
@@ -139,10 +139,17 @@ onBeforeMount(() => {
       </el-form-item>
       <el-form-item label="HOST">
         <el-input v-model="newServer.host">
+          <template #prepend>
+            <el-select v-model="newServer.certify" style="width: 120px">
+              <el-option :value="false" label="http://"></el-option>
+              <el-option :value="true" label="https://"></el-option>
+            </el-select>
+          </template>
         </el-input>
       </el-form-item>
       <el-form-item label="PORT">
-        <el-input-number v-model="newServer.port" placeholder="80" :min="0" :max="2**16 -1"></el-input-number>
+        <el-input-number v-model="newServer.port" :placeholder="newServer.certify ? 443: 80" :min="0"
+                         :max="2**16 -1"></el-input-number>
       </el-form-item>
       <el-form-item label="默认账号">
         <el-select :placeholder="newServer.defaultUser?.username"

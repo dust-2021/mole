@@ -1,13 +1,12 @@
-import {createRouter, createWebHashHistory} from "vue-router";
+import {createRouter, createWebHashHistory, RouteRecordRaw} from "vue-router";
 import ServerPage from "../components/views/ServerPage.vue";
 import ServerConfig from "../components/elements/server/ServerConfig.vue";
 import Room from "../components/views/Room.vue";
 import RoomCreator from "../components/elements/room/RoomCreator.vue";
-import Test from "../components/elements/room/Test.vue";
 import Setting from "../components/elements/system/Setting.vue";
 import ServerItems from "../components/elements/server/ServerItems.vue";
 
-const routes = [
+const routes: RouteRecordRaw[] = [
     {
         path: "/server",
         children: [
@@ -25,7 +24,7 @@ const routes = [
     },
     {
         path: "/test",
-        component: Test,
+        children: []
     },
     {
         path: "/setting",
