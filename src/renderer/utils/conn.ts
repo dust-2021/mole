@@ -1,8 +1,8 @@
-import {Services} from "../stores";
-import {wsReq, wsResp, log} from '../publicType'
+import {Services} from "./stores";
+import {wsReq, wsResp, log} from './publicType'
 import {ElMessage} from "element-plus";
 import {v4 as uuid} from "uuid";
-import {AsyncMap, RWLock} from '../asynchronous'
+import {AsyncMap, RWLock} from '../../shared/asynchronous'
 
 // ws响应处理函数类型，传入当前服务器ws连接类和ws报文
 export type wsHandleFunc = (resp: wsResp) => any;
@@ -71,9 +71,11 @@ export class Connection {
 
     public close() {
         if (this.conn && this.conn.readyState === this.conn.OPEN) {
-            const release = this.lock.acquireWrite();
-            this.conn.close();
-            release.then(this.conn = null);
+            this.lock.acquireWrite().then((f)=> {
+                this.conn.close();
+                this.conn = null;
+                f();
+            });
             return;
         }
         this.conn = null;

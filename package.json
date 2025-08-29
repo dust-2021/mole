@@ -3,10 +3,19 @@
   "version": "1.0.0",
   "main": "dist/main/electron-main.js",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build && tsc",
-    "start": "npm run build && electron .",
-    "electron:build": "vite build && tsc && electron-builder"
+    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:3000 && tsc && electron .\"",
+    "build": "vite build && tsc && electron-builder"
+  },
+  "build": {
+    "extraFiles": [
+      {
+        "from": "lib/wireguard/amd64/${file}",
+        "to": "resources/wireguard/${file}",
+        "filter": [
+          "wireguard.dll"
+        ]
+      }
+    ]
   },
   "keywords": [],
   "author": "li",
@@ -18,6 +27,7 @@
     "@types/node": "^22.13.4",
     "@types/ws": "^8.18.1",
     "electron": "^34.2.0",
+    "electron-builder": "^26.0.12",
     "fast-glob": "^3.3.3",
     "typescript": "^5.7.3",
     "unplugin-auto-import": "^19.1.1",
@@ -30,9 +40,9 @@
     "async-mutex": "^0.5.0",
     "axios": "^1.7.9",
     "buffer": "^6.0.3",
-    "electron-builder": "^26.0.12",
     "element-plus": "^2.9.7",
     "getmac": "^6.6.0",
+    "koffi": "^2.14.0",
     "pinia": "^3.0.2",
     "uuid": "^11.1.0",
     "vite": "^6.1.1",

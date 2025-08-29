@@ -5,7 +5,6 @@ import {Services} from "../../utils/stores";
 import RoomList from "../elements/room/RoomList.vue";
 import ServerConfig from "../elements/server/ServerConfig.vue";
 import ServerAdmin from "../elements/server/ServerAdmin.vue";
-import {Token} from "../../utils/token"
 
 const props = defineProps({
   serverName: {
@@ -16,11 +15,6 @@ const props = defineProps({
 let isMounted = ref(false);
 let svr = ref<server>(null);
 const services = Services();
-
-const isAdmin = computed(() => {
-  const token = new Token(svr.value.token);
-  return token.admin;
-})
 
 onBeforeMount(async () => {
   svr.value = services.get(props.serverName);

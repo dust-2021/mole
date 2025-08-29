@@ -1,4 +1,4 @@
-import {wsRequest, wsHandleFunc} from '../../ws/conn'
+import {wsRequest, wsHandleFunc} from '../../conn'
 
 export async function roomIn(server: string, roomId: string, password?: string, handle?: wsHandleFunc) {
     await wsRequest(server, 'room.in', [roomId, password].filter(e => e !== undefined), handle);

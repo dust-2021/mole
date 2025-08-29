@@ -1,3 +1,5 @@
+import {Token} from "./token";
+
 export type HttpResp = {
     code: number,
     data?: any,
@@ -49,6 +51,7 @@ export function ipcOnce(channel: string, func: (...args: any[]) => void) {
 export type user = {
     username: string,
     password: string,
+    perm?: string[],
 }
 
 // 服务器信息
@@ -58,6 +61,30 @@ export type server = {
     certify: boolean;
     users: user[];
     defaultUser?: user;
-    token?: string;
+    token?: Token;
+}
+
+
+
+// 通知主进程进行nat打洞尝试
+export async function natConnect(address: string, callback?: (resp: boolean) => void) {
+    await ipcInvoke('nat', 'connect', address);
+    if (callback) {
+        ipcOnce(`nat-connect-${address}`, callback);
+    }
+}
+
+// 通知主进程关闭nat心跳检测
+export async function natDisconnect(address: string) {
+    await ipcInvoke('nat', 'disconnect', address);
+}
+
+// 被动断开nat连接
+export function onNatLose(address: string, func: () => void) {
+    ipcOnce(`nat-lose-${address}`, func)
+}
+
+export function removeNatLose(address: string, func: () => void) {
+    ipcRemove(`nat-lose-${address}`, func)
 }
 

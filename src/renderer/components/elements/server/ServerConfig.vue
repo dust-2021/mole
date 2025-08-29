@@ -7,6 +7,7 @@ import {useRouter} from "vue-router";
 import {Plus, Refresh} from '@element-plus/icons-vue'
 import DangerButton from "../DangerButton.vue";
 import {ElMessageBox, ElMessage} from "element-plus";
+import {Token} from "../../../utils/token";
 
 const isNew = ref(false);
 const svr = Services();
@@ -68,7 +69,7 @@ async function changeDefaultUser(u: user) {
   if (newServer.value.defaultUser && u.username === newServer.value.defaultUser.username) {
     return;
   }
-  const token: string | null = await login(props.serverName, u.username, u.password);
+  const token: Token = await login(props.serverName, u.username, u.password);
   if (token === null) {
     ElMessage({
       type: 'error',
@@ -148,7 +149,7 @@ onBeforeMount(() => {
         </el-input>
       </el-form-item>
       <el-form-item label="PORT">
-        <el-input-number v-model="newServer.port" :placeholder="newServer.certify ? 443: 80" :min="0"
+        <el-input-number v-model="newServer.port" :placeholder="newServer.certify ? '443': '80'" :min="0"
                          :max="2**16 -1"></el-input-number>
       </el-form-item>
       <el-form-item label="默认账号">

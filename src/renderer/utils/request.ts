@@ -1,6 +1,7 @@
-import {HttpResp, log, server} from "../publicType"
-import {Services} from '../stores'
+import {HttpResp, log, server} from "./publicType"
+import {Services} from './stores'
 import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
+import {Token} from "./token";
 
 // 参数格式化为请求路由参数
 function queryFormatter(data: Map<string, any>): string {
@@ -21,7 +22,7 @@ export async function fetch(serverName: string, method: string, url: string, wit
     const headers = new AxiosHeaders();
     headers.set("Accept", "application/json");
     if (withToken && svr.token) {
-        headers.set("Token", svr.token);
+        headers.set("Token", svr.token?.token);
     }
     let body: AxiosRequestConfig = {
         headers: headers, validateStatus: (status) => true, method: method.toUpperCase(),
@@ -70,8 +71,8 @@ async function refreshTokenDo(svr: server, host: string, body: AxiosRequestConfi
         if (r.status !== 200 || r.data.code !== 0) {
             throw new AxiosError("refresh token failed");
         }
-        svr.token = r.data.data;
-        body.headers["Token"] = svr.token;
+        svr.token = new Token(r.data.data);
+        body.headers["Token"] = svr.token?.token;
         return await axios.request(body);
 }
 

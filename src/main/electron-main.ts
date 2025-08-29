@@ -1,7 +1,7 @@
 import {app, ipcMain, Menu} from 'electron';
 import {mainWindow} from "./app/window";
 import {initialize} from "./init";
-import {Configs} from './public/public'
+import {Configs} from './public/public';
 
 initialize(ipcMain);
 

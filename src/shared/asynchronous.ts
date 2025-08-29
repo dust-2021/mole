@@ -1,4 +1,4 @@
-import { Mutex, Semaphore } from 'async-mutex';
+import {Mutex, Semaphore} from 'async-mutex';
 
 export class RWLock {
     private readMutex = new Mutex(); // 保护 readerCount
@@ -48,12 +48,12 @@ export class RWLock {
     }
 }
 
-// 异步安全哈希表
+// 异步安全哈希表，采用读写锁机制，不会递归锁定可变成员
 export class AsyncMap<T> {
     private map: Map<string, T> = new Map();
     private readonly lock: RWLock;
 
-    public constructor(lock?:RWLock ) {
+    public constructor(lock?: RWLock) {
         if (lock) {
             this.lock = lock;
         } else {
@@ -65,18 +65,26 @@ export class AsyncMap<T> {
         const release = await this.lock.acquireRead();
         try {
             return this.map.get(key);
-        } catch (e) {
-            return undefined;
         } finally {
             await release();
         }
     }
+
+    public async pop(key: string): Promise<T | undefined> {
+        const release = await this.lock.acquireWrite();
+        try {
+            const item = this.map.get(key);
+            this.map.delete(key);
+            return item;
+        } finally {
+            release();
+        }
+    }
+
     public async has(key: string): Promise<boolean> {
         const release = await this.lock.acquireRead();
         try {
             return this.map.has(key);
-        } catch (e) {
-            return false;
         } finally {
             await release();
         }
@@ -86,7 +94,7 @@ export class AsyncMap<T> {
         const release = await this.lock.acquireWrite();
         try {
             this.map.set(key, value);
-        } catch (e) {} finally {
+        } finally {
             release();
         }
     }
@@ -95,8 +103,28 @@ export class AsyncMap<T> {
         const release = await this.lock.acquireWrite();
         try {
             this.map.delete(key);
-        }catch (e) {} finally {
+        } finally {
             release();
+        }
+    }
+
+    // 获取原始map数据，在锁定写入状态下执行
+    public async withLock(func: (v: Map<string, T>) => void): Promise<void> {
+        const release = await this.lock.acquireWrite();
+        try{
+            func(this.map);
+        } finally {
+            release();
+        }
+    }
+
+    // 获取原始map数据，在锁定读取状态下执行
+    public async withRLock(func: (v: Map<string, T>) => void): Promise<void> {
+        const release = await this.lock.acquireRead();
+        try {
+            func(this.map);
+        }finally {
+            await release();
         }
     }
 }

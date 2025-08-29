@@ -21,7 +21,8 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src/renderer'), // 设置别名
+            '@render': path.resolve(__dirname, './src/renderer'), // 设置别名
+            '@shared': path.resolve(__dirname, './src/shared'),
         },
     },
     base: './', // 确保静态资源路径正确
@@ -29,6 +30,7 @@ export default defineConfig({
         port: 3000, // 开发服务器端口
         strictPort: true,
         host: '0.0.0.0',
+        hmr: true,
     },
     build: {
         outDir: 'dist/renderer', // 构建输出目录

@@ -3,7 +3,7 @@ import {app, ipcMain} from "electron";
 import os from 'os';
 import fs = require('fs');
 import {Configs, Logger} from "./public/public";
-import {natHandler} from "./ws/nat";
+import {handleIPC, natHandler} from "./vlan/nat";
 
 // 注册主进程和渲染进程通信接口
 export function initialIPC(ipc: typeof ipcMain) {
@@ -22,7 +22,9 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("macAddress", (Event) => {
         return getMacAddress();
     })
-    ipc.handle("nat", (Event) => {})
+    ipc.handle("nat", (Event, method: string, address: string) => {
+        handleIPC(method, address);
+    });
     ipc.handle("log", (Event, level: string, message: string) => {
         Logger.log(level, message);
     })

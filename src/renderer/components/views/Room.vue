@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {Services} from "../../utils/stores";
-import {server, wsResp} from "../../utils/publicType";
+import {server, wsResp, natConnect, natDisconnect, onNatLose, removeNatLose} from "../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import Message from "../elements/room/Message.vue";
-import {ArrowLeft, CopyDocument, Lock, Unlock} from '@element-plus/icons-vue'
 import SystemMessage from "../elements/room/SystemMessage.vue";
-import {Connection} from "../../utils/ws/conn";
+import {Connection} from "../../utils/conn";
 import {roomOut, roomMessage, roomForbidden, roomMates} from '../../utils/api/ws/room'
 import {Mutex} from 'async-mutex';
 import IconButton from "../elements/IconButton.vue";
@@ -109,11 +108,13 @@ function onJoinRoom(resp: wsResp) {
     userId: data.id, username: data.name, addr: data.addr, owner: data.owner
   });
   messages.value.push({from: 0, text: `${data.name}加入房间`, timestamp: Date.now()});
+  natConnect(data.addr).then();
 }
 
 function onLeaveRoom(resp: wsResp) {
   const id: number = resp.data;
   messages.value.push({from: 0, text: `${members.value.get(id)?.username}离开房间`, timestamp: Date.now()});
+  natDisconnect(members.value.get(id)?.addr).then(() => {});
   members.value.delete(id);
 }
 
@@ -180,6 +181,8 @@ onBeforeMount(async () => {
             self.value = {
               userId: item.id, username: item.name, addr: item.addr, owner: item.owner
             }
+          } else {
+            natConnect(item.addr).then(() => {});
           }
           members.value.set(item.id, {
             userId: item.id,

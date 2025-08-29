@@ -9,6 +9,8 @@ const storePath = app.getPath('userData');
 
 export const BaseDir = path.dirname(path.dirname(__dirname));
 
+export let environment: string = "dev";
+
 class AppConfig {
     private attribute: Map<string, any>;
     private static readonly path: string = path.join(storePath, 'config.json');

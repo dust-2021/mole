@@ -1,4 +1,4 @@
-import {fetch} from "../../http/request";
+import {fetch} from "../../request";
 import {ElMessage} from "element-plus";
 
 export async function serverTime(serverName: string): Promise<number | null> {

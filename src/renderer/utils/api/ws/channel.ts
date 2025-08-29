@@ -1,4 +1,4 @@
-import {wsRequest, wsHandleFunc, Connection} from '../../ws/conn'
+import {wsRequest, wsHandleFunc, Connection} from '../../conn'
 import {wsResp} from "../../publicType";
 import {ElMessage} from "element-plus";
 

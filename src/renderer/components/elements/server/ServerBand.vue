@@ -8,7 +8,7 @@ import {ElMessage} from "element-plus";
 import {subscribe, unsubscribe} from "../../../utils/api/ws/channel";
 import {login} from '../../../utils/api/http/user'
 import {auth} from '../../../utils/api/ws/base'
-import {Connection as wsConn} from "../../../utils/ws/conn";
+import {Connection as wsConn} from "../../../utils/conn";
 import {Services} from '../../../utils/stores'
 
 const router = useRouter()
@@ -77,7 +77,7 @@ function pingTask() {
 }
 
 onBeforeMount(() => {
-  login(props.serverName, props.curServer.defaultUser?.username, props.curServer.defaultUser?.password).then((resp: string | null) => {
+  login(props.serverName, props.curServer.defaultUser?.username, props.curServer.defaultUser?.password).then((resp) => {
     if (resp !== null) {
       const svr = Services().get(props.serverName);
       svr.token = resp;
