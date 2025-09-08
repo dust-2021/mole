@@ -1,3 +1,4 @@
+import { ElMessage } from "element-plus";
 import {Token} from "./token";
 
 export type HttpResp = {
@@ -87,4 +88,11 @@ export function onNatLose(address: string, func: () => void) {
 export function removeNatLose(address: string, func: () => void) {
     ipcRemove(`nat-lose-${address}`, func)
 }
+
+ipcOn('msg', (type_: 'info' | 'success'| 'error' | 'warning', msg: string) => {
+    ElMessage({
+        type: type_,
+        message: msg
+    })
+})
 

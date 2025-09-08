@@ -27,6 +27,7 @@ interface member {
   username: string,
   addr: string,
   owner: boolean,
+  vlan: string,
 }
 
 interface message {
@@ -103,9 +104,9 @@ async function sendMessage(): Promise<void> {
 }
 
 function onJoinRoom(resp: wsResp) {
-  const data: { id: number, name: string, owner: boolean, addr: string } = resp.data;
+  const data: { id: number, name: string, owner: boolean, addr: string, vlan: string } = resp.data;
   members.value.set(data.id, {
-    userId: data.id, username: data.name, addr: data.addr, owner: data.owner
+    userId: data.id, username: data.name, addr: data.addr, owner: data.owner, vlan: data.vlan
   });
   messages.value.push({from: 0, text: `${data.name}加入房间`, timestamp: Date.now()});
   natConnect(data.addr).then();
@@ -114,7 +115,8 @@ function onJoinRoom(resp: wsResp) {
 function onLeaveRoom(resp: wsResp) {
   const id: number = resp.data;
   messages.value.push({from: 0, text: `${members.value.get(id)?.username}离开房间`, timestamp: Date.now()});
-  natDisconnect(members.value.get(id)?.addr).then(() => {});
+  natDisconnect(members.value.get(id)?.addr).then(() => {
+  });
   members.value.delete(id);
 }
 
@@ -153,7 +155,7 @@ async function forbiddenRoom() {
     return;
   }
   await roomForbidden(props.serverName, props.roomId, !forbidden.value, (resp: wsResp) => {
-    if (resp.statusCode !== 0)  {
+    if (resp.statusCode !== 0) {
       ElMessage({
         type: 'warning',
         message: `关闭房间失败：${resp.data}`
@@ -179,16 +181,18 @@ onBeforeMount(async () => {
           // 获取自己的账号信息
           if (item.name === svr.value.defaultUser.username) {
             self.value = {
-              userId: item.id, username: item.name, addr: item.addr, owner: item.owner
+              userId: item.id, username: item.name, addr: item.addr, owner: item.owner, vlan: item.vlan
             }
           } else {
-            natConnect(item.addr).then(() => {});
+            natConnect(item.addr).then(() => {
+            });
           }
           members.value.set(item.id, {
             userId: item.id,
             username: item.name,
             addr: item.addr,
-            owner: item.owner
+            owner: item.owner,
+            vlan: item.vlan
           })
         }
       });
@@ -223,18 +227,20 @@ onBeforeUnmount(async () => {
         <div style="margin-bottom: 1px">
           <el-row :gutter="24">
             <el-col :span="8">
-              <div class="room-btn"><IconButton :size="24" icon="leaveRoom" @click="router.go(-1)"></IconButton></div>
+              <div class="room-btn">
+                <IconButton :size="24" icon="leaveRoom" @click="router.go(-1)"></IconButton>
+              </div>
 
             </el-col>
             <el-col :span="8">
               <div class="room-btn">
-              <IconButton icon="unlock" :size="24" @click="forbiddenRoom" v-if="forbidden"></IconButton>
-              <IconButton icon="lock" :size="24" @click="forbiddenRoom" v-else></IconButton>
+                <IconButton icon="unlock" :size="24" @click="forbiddenRoom" v-if="forbidden"></IconButton>
+                <IconButton icon="lock" :size="24" @click="forbiddenRoom" v-else></IconButton>
               </div>
             </el-col>
             <el-col :span="8">
               <div class="room-btn">
-              <IconButton icon="copy" :size="24" @click="copyRoomId(props.roomId)"></IconButton>
+                <IconButton icon="copy" :size="24" @click="copyRoomId(props.roomId)"></IconButton>
               </div>
             </el-col>
           </el-row>
@@ -312,6 +318,7 @@ onBeforeUnmount(async () => {
   margin: auto;
   padding: 5px;
 }
+
 .center-item {
   display: flex;
   justify-items: center;

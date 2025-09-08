@@ -1,6 +1,6 @@
-import {Logger, Configs} from "../public/public";
+import {Logger, Configs} from "./public";
 import dgram = require('dgram')
-import {AsyncMap} from "../../shared/asynchronous";
+import {AsyncMap} from "../shared/asynchronous";
 import {ipcRenderer} from "electron";
 
 

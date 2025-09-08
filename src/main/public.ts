@@ -3,14 +3,22 @@
 * */
 import path = require('path');
 import fs = require('fs');
-import {app} from "electron";
+import {app, ipcRenderer} from "electron";
 
 const storePath = app.getPath('userData');
 
-export const BaseDir = path.dirname(path.dirname(__dirname));
+// src目录，编译后的dist目录
+export const BaseDir = path.dirname(__dirname);
 
-export let environment: string = "dev";
+const env = process.env.NODE_ENV;
+export let environment: string = env ? env : "pro";
 
+// 向窗口发送消息
+export function sendToFront(type_ : 'info' | 'warning' | 'success' | 'error', msg: string): void {
+    ipcRenderer.send('msg', type_, msg);
+}
+
+// app设置项
 class AppConfig {
     private attribute: Map<string, any>;
     private static readonly path: string = path.join(storePath, 'config.json');
@@ -77,4 +85,6 @@ export const Logger = winston.createLogger({
         })  // 日志文件输出
     ]
 });
+
+Logger.info(`app run on env: ${environment}`);
 

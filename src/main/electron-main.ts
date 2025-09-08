@@ -1,10 +1,13 @@
 import {app, ipcMain, Menu} from 'electron';
 import {mainWindow} from "./app/window";
 import {initialize} from "./init";
-import {Configs} from './public/public';
+import {Configs} from './public';
+import {WgHandler} from "./extern/wireguard/wireguard";
 
 initialize(ipcMain);
 
+WgHandler.check().then(r => {});
+WgHandler.createRoom('cv6');
 // Menu.setApplicationMenu(null);
 
 app.whenReady().then(mainWindow);

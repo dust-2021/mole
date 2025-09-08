@@ -1,5 +1,5 @@
 import {app, BrowserWindow, ipcMain} from "electron";
-import {BaseDir, environment} from "../public/public";
+import {BaseDir, environment} from "../public";
 import path from "path";
 
 export function mainWindow() {
