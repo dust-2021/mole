@@ -27,11 +27,14 @@ class Wg {
     private baseApi: CType.wgApi;
     private privateKey: Buffer;
     private publicKey: Buffer;
-    private static callbackFuncHolder: Map<string, koffi.IKoffiRegisteredCallback> = new Map();
+    private config: CType.adapterConfigManager;
 
     public constructor() {
         this.privateKey = crypto.randomBytes(32);
         this.publicKey = crypto.createHash('sha256').update(this.privateKey).digest();
+        this.config = new CType.adapterConfigManager();
+        this.config.setPort(Configs.natPort);
+        this.config.setKey(this.publicKey, this.privateKey);
         if (platform === "win32") {
             this.baseApi = win64;
         } else {
@@ -39,7 +42,6 @@ class Wg {
         }
         let cb = koffi.register(loggerCallback, koffi.pointer(CType.WireGuardLoggerCallback));
         this.baseApi.WireGuardSetLogger(cb);
-        Wg.callbackFuncHolder.set('base', cb);
     }
 
     private async getDllError(): Promise<string> {
@@ -70,13 +72,8 @@ class Wg {
             Logger.error(`创建适配器失败：${err}`);
             return false;
         };
-        const conf: CType.WIREGUARD_INTERFACE_js = {
-            Flags: CType.WIREGUARD_INTERFACE_FLAG.WIREGUARD_INTERFACE_HAS_LISTEN_PORT | CType.WIREGUARD_INTERFACE_FLAG.WIREGUARD_INTERFACE_HAS_PRIVATE_KEY |
-                CType.WIREGUARD_INTERFACE_FLAG.WIREGUARD_INTERFACE_HAS_PUBLIC_KEY,
-            ListenPort: Configs.natPort, PrivateKey: new Uint8Array(this.privateKey), PublicKey: new Uint8Array(this.publicKey),
-            PeersCount: 0
-        }
-        const result = this.baseApi.WireGuardSetConfiguration(handle, conf, koffi.sizeof(CType.WIREGUARD_INTERFACE));
+        const conf = await this.config.generateDeclare();
+        const result = this.baseApi.WireGuardSetConfiguration(handle, conf.interface, conf.size);
         if (!result) {
             const msg = await this.getDllError();
             Logger.error(`创建虚拟局域网失败：${msg}`);

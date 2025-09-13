@@ -62,6 +62,6 @@ export const WireGuardAPI: CType.wgApi = {
     WireGuardSetAdapterLogging: wg.func('WireGuardSetAdapterLogging', koffi.types.bool, [koffi.types.int]),
     WireGuardSetAdapterState: wg.func('WireGuardSetAdapterState', koffi.types.bool, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, koffi.types.int]),
     WireGuardGetAdapterState: wg.func('WireGuardGetAdapterState', koffi.types.bool, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, koffi.pointer(koffi.types.int)]),
-    WireGuardSetConfiguration: wg.func('WireGuardSetConfiguration', koffi.types.void, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, 
+    WireGuardSetConfiguration: wg.func('WireGuardSetConfiguration', koffi.types.bool, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, 
         koffi.pointer(CType.WIREGUARD_INTERFACE), koffi.types.int]),
 };

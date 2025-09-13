@@ -1,3 +1,4 @@
+import { all } from 'axios';
 import { AsyncMap, RWLock } from '../../../shared/asynchronous';
 import koffi = require('koffi');
 
@@ -29,7 +30,7 @@ export enum tunnelType {
 // ip类型
 export enum IPFamily {
     AF_INET = 2,
-    AF_INET6 = 10
+    AF_INET6 = 23
 }
 
 // 适配器日志状态
@@ -66,12 +67,41 @@ export enum WIREGUARD_PEER_FLAG {
 }
 
 
+
+
+// sockaddr_in结构体
+const SOCKADDR_IN = koffi.struct('SOCKADDR_IN', {
+    sin_port: koffi.types.uint16,
+    sin_addr: c_type.IN_ADDR,
+    sin_family: koffi.types.uint16,
+    sin_zero: koffi.array(koffi.types.char, 8),
+});
+
+const SOCKADDR_IN6 = koffi.struct('SOCKADDR_IN6', {
+    sin6_family: koffi.types.uint16,// AF_INET6.
+    sin6_port: koffi.types.uint16,        // Transport level port number.
+    sin6_flowinfo: koffi.types.uint64,       // IPv6 flow information.
+    sin6_addr: c_type.IN6_ADDR,
+    // IPv6 address.
+    // union {
+    //     ULONG sin6_scope_id;     // Set of interfaces for a scope.
+    //     SCOPE_ID sin6_scope_struct;
+    // };
+});
+
+// peer的地址端口信息
+export const SOCKADDR_INET = koffi.struct('SOCKADDR_INET', {
+    Ipv4: SOCKADDR_IN,
+    Ipv6: SOCKADDR_IN6,
+    si_family: koffi.types.uint16,
+});
+
 // IP地址结构体
 export const WIREGUARD_ALLOWED_IP = koffi.struct('WIREGUARD_ALLOWED_IP', {
     // ip地址类型
     AddressFamily: koffi.types.uint16,
     // 掩码
-    Cidr: koffi.types.int8,
+    Cidr: koffi.types.uint8,
     // IP地址
     Address: koffi.union('Address', {
         V4: c_type.IN_ADDR, V6: c_type.IN6_ADDR,
@@ -122,17 +152,17 @@ export function formatterIp4(address: string): WIREGUARD_ALLOWED_IP_js {
 // 局域网成员结构体
 export const WIREGUARD_PEER = koffi.struct('WIREGUARD_PEER', {
     /**< Bitwise combination of flags */
-    Flags: koffi.types.uint,
+    Flags: [8, koffi.types.uint],
     /**< Reserved; must be zero */
-    Reserved: koffi.types.int,
+    Reserved: [8, koffi.types.int],
     /**< Public key, the peer's primary identifier */
     PublicKey: koffi.array(koffi.types.char, 32),
     /**< Preshared key for additional layer of post-quantum resistance */
     PresharedKey: koffi.array(koffi.types.char, 32),
     /**< Seconds interval, or 0 to disable */
-    PersistentKeepalive: koffi.types.int,
+    PersistentKeepalive: [8, koffi.types.int],
     /**< Endpoint, with IP address and UDP port number*/
-    Endpoint: c_type.IN_ADDR,
+    Endpoint: SOCKADDR_INET,
     /**< Number of bytes transmitted */
     TxBytes: koffi.types.int64,
     /**< Number of bytes received */
@@ -140,7 +170,7 @@ export const WIREGUARD_PEER = koffi.struct('WIREGUARD_PEER', {
     /**< Time of the last handshake, in 100ns intervals since 1601-01-01 UTC */
     LastHandshake: koffi.types.int64,
     /**< Number of allowed IP structs following this struct */
-    AllowedIPsCount: koffi.types.int,
+    AllowedIPsCount: [8, koffi.types.int],
 })
 
 // wireguard日志回调函数类型定义
@@ -154,54 +184,105 @@ export enum WIREGUARD_LOGGER_LEVEL {
 }
 
 export interface WIREGUARD_PEER_js {
-    Flag: number, Reserved: number, PublicKey: Buffer, PresharedKey: Buffer, PersistentKeepalive?: number,
+    Flag: number, Reserved: number, PublicKey: Uint8Array, PresharedKey: Uint8Array, PersistentKeepalive?: number,
     Endpoint: string, TxBytes: number, RxBytes: number, LastHandshake?: number, AllowedIPsCount: number
 }
 
 // 虚拟网卡配置结构体
 export const WIREGUARD_INTERFACE = koffi.struct('WIREGUARD_INTERFACE', {
     /**< Bitwise combination of flags */
-    Flags: koffi.types.uint,
+    Flags: [8, koffi.types.uint],
     /**< Port for UDP listen socket, or 0 to choose randomly */
-    ListenPort: koffi.types.int,
+    ListenPort: [8, koffi.types.int],
     /**< Private key of interface */
     PrivateKey: koffi.array(koffi.types.uint8, 32),
     /**< Corresponding public key of private key */
     PublicKey: koffi.array(koffi.types.uint8, 32),
     /**< Number of peer structs following this struct */
-    PeersCount: koffi.types.int
+    PeersCount: [8, koffi.types.int]
 })
 
 export interface WIREGUARD_INTERFACE_js {
-    Flags: number, ListenPort: number, PrivateKey: Uint8Array, PublicKey: Uint8Array, PeersCount: number
+    Flags: number, ListenPort: number, PrivateKey: Buffer, PublicKey: Buffer, PeersCount: number
 }
 
+export type adapterConfig_js = { [key: string]: WIREGUARD_INTERFACE_js | WIREGUARD_PEER_js | WIREGUARD_ALLOWED_IP_js };
+
 // 适配器配置类型
-export class adapterConfig {
+export class adapterConfigManager {
+
     private interface: WIREGUARD_INTERFACE_js;
-    private peers: AsyncMap<{ peer: WIREGUARD_PEER_js, allowedIP: WIREGUARD_ALLOWED_IP_js[] }>;
+    private peers: Map<string, { peer: WIREGUARD_PEER_js, allowedIP: WIREGUARD_ALLOWED_IP_js[] }>;
     private lock: RWLock = new RWLock();
 
     public constructor() {
         this.interface = {
-            Flags: 0, ListenPort: 0, PrivateKey: new Uint8Array(), PublicKey: new Uint8Array(), PeersCount: 0
+            Flags: 0, ListenPort: 0, PrivateKey: Buffer.alloc(32), PublicKey: Buffer.alloc(32), PeersCount: 0
         };
-        this.peers = new AsyncMap();
+        this.peers = new Map();
     };
 
-    // 生成配置的C结构体声明
-    public async generateDeclare(config: { [key: string]: WIREGUARD_INTERFACE_js | WIREGUARD_PEER_js | WIREGUARD_ALLOWED_IP_js }): Promise<koffi.IKoffiCType> {
+    // 生成配置的C结构体，并返回结构体长度
+    public async generateDeclare(): Promise<{ interface: any, size: number }> {
+        const release = await this.lock.acquireRead();
+        try {
+            const typed = this.declare();
+            const buffer = koffi.alloc(typed, koffi.sizeof(typed));
+        } finally { await release(); };
+
+    }
+
+    private declare(): koffi.IKoffiCType {
+        let typed: { [key: string]: koffi.IKoffiCType } = { 'Interface': WIREGUARD_INTERFACE };
+        for (const [k, v] of this.peers) {
+            typed[k] = WIREGUARD_PEER;
+            for (const [i, item] of v.allowedIP.entries()) {
+                typed[`${k}_AllowedIP_${i}`] = WIREGUARD_ALLOWED_IP;
+            }
+        }
+        return koffi.struct('wgConfig', typed);
+    }
+
+    // 设置适配器监听端口
+    public async setPort(port: number) {
+        if (port < 0 || port > 65535) {
+            throw new Error('invalid port');
+        }
+        const release = await this.lock.acquireRead();
+        try {
+            this.interface.ListenPort = port;
+            this.interface.Flags |= WIREGUARD_INTERFACE_FLAG.WIREGUARD_INTERFACE_HAS_LISTEN_PORT;
+        } finally {
+            await release();
+        }
+    }
+
+    // 设置通信加密密钥
+    public async setKey(pub: Buffer, pri: Buffer) {
+        if (pub.length !== 32 || pri.length !== 32) {
+            throw new Error('invalied length of key');
+        }
         const release = await this.lock.acquireWrite();
         try {
-            let koffiType = { Interface: WIREGUARD_INTERFACE } as { [key: string]: koffi.IKoffiCType };
-            config['Interface'] = this.interface;
-            this.peers.withRLock(() => {
-
-            })
-            return koffi.struct('Config', koffiType)
+            this.interface.PublicKey = Buffer.from(pub);
+            this.interface.PrivateKey = Buffer.from(pri);
+            this.interface.Flags |= WIREGUARD_INTERFACE_FLAG.WIREGUARD_INTERFACE_HAS_PRIVATE_KEY | WIREGUARD_INTERFACE_FLAG.WIREGUARD_INTERFACE_HAS_PUBLIC_KEY;
         } finally {
             release();
         }
+    }
+
+    public async addPeer(name: string, peer: WIREGUARD_PEER_js, ...allowedIp: WIREGUARD_ALLOWED_IP_js[]) {
+        const release = await this.lock.acquireWrite();
+        try {
+            if (!this.peers.has(name)) {
+                this.interface.PeersCount += 1;
+            };
+            this.peers.set(name, { peer: peer, allowedIP: allowedIp });
+        } finally {
+            release();
+        }
+
     }
 }
 
@@ -226,7 +307,7 @@ export interface wgApi {
     WireGuardSetAdapterState: (handle: any, state: WIREGUARD_ADAPTER_STATE) => boolean;
     // 获取适配器状态
     WireGuardGetAdapterState: (handle: any, state: Buffer) => boolean;
-    // 设置适配器，handle-适配器句柄指针，config-符合c结构体的对象指针，size-config的大小
-    WireGuardSetConfiguration: (handle: any, config: WIREGUARD_INTERFACE_js, size: number) => boolean;
+    // 设置适配器，handle-适配器句柄指针，interfaceAddress-符合c结构体的对象的Interface成员指针，size-config的大小
+    WireGuardSetConfiguration: (handle: any, interfaceAddress: any, size: number) => boolean;
 
 }
