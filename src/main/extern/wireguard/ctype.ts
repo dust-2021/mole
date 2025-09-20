@@ -1,4 +1,3 @@
-import { all } from 'axios';
 import { AsyncMap, RWLock } from '../../../shared/asynchronous';
 import koffi = require('koffi');
 
@@ -222,15 +221,6 @@ export class adapterConfigManager {
         this.peers = new Map();
     };
 
-    // 生成配置的C结构体，并返回结构体长度
-    public async generateDeclare(): Promise<{ interface: any, size: number }> {
-        const release = await this.lock.acquireRead();
-        try {
-            const typed = this.declare();
-            const buffer = koffi.alloc(typed, koffi.sizeof(typed));
-        } finally { await release(); };
-
-    }
 
     private declare(): koffi.IKoffiCType {
         let typed: { [key: string]: koffi.IKoffiCType } = { 'Interface': WIREGUARD_INTERFACE };

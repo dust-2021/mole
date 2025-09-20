@@ -64,25 +64,6 @@ class Wg {
         Logger.info(`wireguard驱动版本号：${version}`);
     }
 
-    // 创建虚拟局域网房间
-    public async createRoom(name: string, tunType: CType.tunnelType = CType.tunnelType.wireguardNT): Promise<boolean> {
-        const handle = this.baseApi.WireGuardCreateAdapter(name, tunType, null);
-        if (!handle) {
-            const err = await this.getDllError();
-            Logger.error(`创建适配器失败：${err}`);
-            return false;
-        };
-        const conf = await this.config.generateDeclare();
-        const result = this.baseApi.WireGuardSetConfiguration(handle, conf.interface, conf.size);
-        if (!result) {
-            const msg = await this.getDllError();
-            Logger.error(`创建虚拟局域网失败：${msg}`);
-            this.baseApi.WireGuardCloseAdapter(handle);
-            return false;
-        }
-        return true;
-    }
-
 
 }
 
