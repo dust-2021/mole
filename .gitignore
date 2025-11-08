@@ -1,11 +1,13 @@
 dist/
-builder/
 node_modules/
+locals/
 .idea
 .vscode
-*.log
-*.exe
-*.gch
+lib/
+!lib/src
+!lib/wireguard_handle.cpp
+
+*.pdb
 
 
 auto-imports.d.ts

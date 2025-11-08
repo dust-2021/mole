@@ -53,15 +53,5 @@ export function checkDLLError(): string {
 
 // 定义 WireGuard API 函数，枚举类型全部使用枚举成员的原始int值代替
 export const WireGuardAPI: CType.wgApi = {
-    WireGuardGetRunningDriverVersion: wg.func('WireGuardGetRunningDriverVersion', koffi.types.int, []),
-    WireGuardCreateAdapter: wg.func('WireGuardCreateAdapter', CType.c_type.WIREGUARD_ADAPTER_HANDLE, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR, CType.c_type.GUID]),
-    WireGuardOpenAdapter: wg.func('WireGuardOpenAdapter', CType.c_type.WIREGUARD_ADAPTER_HANDLE, [CType.c_type.LPCWSTR]),
-    WireGuardCloseAdapter: wg.func('WireGuardCloseAdapter', koffi.types.void, [CType.c_type.WIREGUARD_ADAPTER_HANDLE]),
-    WireGuardDeleteDriver: wg.func('WireGuardDeleteDriver', koffi.types.void, []),
-    WireGuardSetLogger: wg.func('WireGuardSetLogger', koffi.types.void, [koffi.pointer(CType.WireGuardLoggerCallback)]),
-    WireGuardSetAdapterLogging: wg.func('WireGuardSetAdapterLogging', koffi.types.bool, [koffi.types.int]),
-    WireGuardSetAdapterState: wg.func('WireGuardSetAdapterState', koffi.types.bool, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, koffi.types.int]),
-    WireGuardGetAdapterState: wg.func('WireGuardGetAdapterState', koffi.types.bool, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, koffi.pointer(koffi.types.int)]),
-    WireGuardSetConfiguration: wg.func('WireGuardSetConfiguration', koffi.types.bool, [CType.c_type.WIREGUARD_ADAPTER_HANDLE, 
-        koffi.pointer(CType.WIREGUARD_INTERFACE), koffi.types.int]),
+
 };
