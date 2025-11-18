@@ -6,12 +6,12 @@ import iconv from 'iconv-lite';
 
 let srcDir: string;
 if (environment === "dev") {
-    srcDir = path.join(BaseDir, '../lib/wireguard/amd64');
+    srcDir = path.join(BaseDir, '../lib/src');
 } else {
     srcDir = path.join(process.resourcesPath, 'resources', 'wireguard')
 }
 
-srcDir = path.join(srcDir, 'wireguard.dll');
+srcDir = path.join(srcDir, 'wireguard_handle.dll');
 const wg = koffi.load(srcDir);
 
 const win32 = koffi.load('kernel32.dll');
@@ -53,5 +53,6 @@ export function checkDLLError(): string {
 
 // 定义 WireGuard API 函数，枚举类型全部使用枚举成员的原始int值代替
 export const WireGuardAPI: CType.wgApi = {
-
+    set_logger: wg.func("set_logger", CType.c_type.response, [CType.WireGuardLoggerCallback]),
+    create_room: wg.func(""),
 };
