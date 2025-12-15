@@ -1,5 +1,5 @@
 import { ElMessage } from "element-plus";
-import {Token} from "./token";
+import { Token } from "./token";
 
 export type HttpResp = {
     code: number,
@@ -89,10 +89,21 @@ export function removeNatLose(address: string, func: () => void) {
     ipcRemove(`nat-lose-${address}`, func)
 }
 
-ipcOn('msg', (type_: 'info' | 'success'| 'error' | 'warning', msg: string) => {
+ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
     ElMessage({
         type: type_,
         message: msg
     })
 })
+
+export const wireguardFunc = {
+    createRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName) ;},
+    delRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delRoom", roomName); },
+    addPeer: async (roomName: string, peerName: string, ip: string, port: number,
+        pub_key: string, vlan_ip: string, vlan_mask: number
+    ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_mask); },
+    delPeer: async (roomName: string, peerName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delPeer", roomName, peerName); },
+    // 获取base64编码格式公钥
+    getPublicKey: async () : Promise<string> => {return await ipcInvoke("wireguard-publicKey")}
+}
 

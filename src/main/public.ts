@@ -1,6 +1,3 @@
-/*
-* 用于electron和vue直接通信的类型规范
-* */
 import path = require('path');
 import fs = require('fs');
 import {app, ipcRenderer} from "electron";
@@ -10,7 +7,7 @@ const storePath = app.getPath('userData');
 // src目录，编译后的dist目录
 export const BaseDir = path.dirname(__dirname);
 
-const env = process.env.NODE_ENV;
+const env = process.env.MOLE_ENV;
 export let environment: string = env ? env : "pro";
 
 // 向窗口发送消息

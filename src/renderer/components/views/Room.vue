@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {Services} from "../../utils/stores";
-import {server, wsResp, natConnect, natDisconnect, onNatLose, removeNatLose} from "../../utils/publicType";
+import {server, wsResp, natConnect, natDisconnect, onNatLose, removeNatLose, wireguardFunc} from "../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import Message from "../elements/room/Message.vue";
@@ -36,15 +36,24 @@ interface message {
   timestamp: number
 }
 
+// 组件挂载完成信号
 const mounted = ref(false);
+// 本地保存的服务器信息
 const services = Services();
+// 当前服务器信息
 const svr = ref<server>(null);
-const messages = ref<message[]>(null);
+// 当前消息
+const messages = ref<message[]>([]);
+// 当前消息同步锁
 const messagesLock: Mutex = new Mutex();
+// 房间成员信息
 const members = ref<Map<number, member>>(new Map());
+// 自己的信息
 const self = ref<member>(null);
+// 输入框文本
 const inputMessage = ref<string>('');
 const router = useRouter();
+// 房间是否禁止进入
 const forbidden = ref(false);
 const conn = Connection.getInstance(props.serverName);
 
@@ -55,7 +64,7 @@ async function onMessage(resp: wsResp) {
     messages.value.push({from: data.senderId, text: data.data, timestamp: data.timestamp});
     const k = messages.value.length;
     if (k >= 1000) {
-      messages.value = messages.value.slice(k - 1001, 1000);
+      messages.value = messages.value.slice(k - 500, k);
     }
   } catch (error) {
   } finally {
@@ -115,7 +124,11 @@ function onJoinRoom(resp: wsResp) {
 function onLeaveRoom(resp: wsResp) {
   const id: number = resp.data;
   messages.value.push({from: 0, text: `${members.value.get(id)?.username}离开房间`, timestamp: Date.now()});
-  natDisconnect(members.value.get(id)?.addr).then(() => {
+  const memberLeft = members.value.get(id);
+  if(memberLeft == undefined) {
+    return
+  }
+  natDisconnect(memberLeft.addr).then(() => {
   });
   members.value.delete(id);
 }
@@ -124,12 +137,10 @@ function onOwnerChange(resp: wsResp) {
   const data: { old: number, new: number } = resp.data;
   const old_ = members.value.get(data.old);
   const new_ = members.value.get(data.new);
-  if (old_ !== undefined) {
-    old_.owner = false;
-  }
-  if (new_ === undefined) {
+  if (old_ === undefined || new_ === undefined) {
     return;
   }
+  old_.owner = false;
   new_.owner = true;
   messages.value.push({from: 0, text: `房主已移交至${new_.username}`, timestamp: Date.now()});
 
@@ -147,7 +158,7 @@ function onForbiddenRoom(resp: wsResp) {
 }
 
 async function forbiddenRoom() {
-  if (!members.value.get(self.value.userId).owner) {
+  if (!members.value.get(self.value.userId)?.owner) {
     ElMessage({
       message: '仅房主可用',
       type: 'warning'
@@ -166,7 +177,16 @@ async function forbiddenRoom() {
 
 
 onBeforeMount(async () => {
-  svr.value = services.get(props.serverName);
+  const s = services.get(props.serverName);
+  if ( s == undefined) {
+    ElMessage({
+      showClose: true, message: '获取服务器失败', type: 'error'
+    })
+    return 
+  }
+  // 创建虚拟局域网
+  await wireguardFunc.createRoom(props.roomId);
+  svr.value = s;
   await roomMates(props.serverName, props.roomId,
       (resp: wsResp) => {
         if (resp.statusCode !== 0) {
@@ -179,7 +199,7 @@ onBeforeMount(async () => {
         }
         for (const item of resp.data) {
           // 获取自己的账号信息
-          if (item.name === svr.value.defaultUser.username) {
+          if (item.name === svr.value.defaultUser?.username) {
             self.value = {
               userId: item.id, username: item.name, addr: item.addr, owner: item.owner, vlan: item.vlan
             }
@@ -209,14 +229,15 @@ onBeforeMount(async () => {
 })
 
 onBeforeUnmount(async () => {
+  await wireguardFunc.delRoom(props.roomId);
   await roomOut(props.serverName, props.roomId);
 
-  conn.methodHandler(`publish.room.notice.in`)
-  conn.methodHandler(`publish.room.notice.exchangeOwner`)
-  conn.methodHandler(`publish.room.notice.out`)
-  conn.methodHandler(`publish.room.message`)
-  conn.methodHandler(`publish.room.notice.close`)
-  conn.methodHandler(`publish.room.notice.forbidden`)
+  conn.removeMethodHandler(`publish.room.notice.in`)
+  conn.removeMethodHandler(`publish.room.notice.exchangeOwner`)
+  conn.removeMethodHandler(`publish.room.notice.out`)
+  conn.removeMethodHandler(`publish.room.message`)
+  conn.removeMethodHandler(`publish.room.notice.close`)
+  conn.removeMethodHandler(`publish.room.notice.forbidden`)
 })
 </script>
 
@@ -225,7 +246,7 @@ onBeforeUnmount(async () => {
     <el-row :gutter="24" v-if="mounted" style="height: 100%;width: 100%">
       <el-col :span="6" style="height: 100%;border-right: 1px solid #eee;">
         <div style="margin-bottom: 1px">
-          <el-row :gutter="24">
+          <el-row :gutter="24" style="padding: 2px 5px;">
             <el-col :span="8">
               <div class="room-btn">
                 <IconButton :size="24" icon="leaveRoom" @click="router.go(-1)"></IconButton>

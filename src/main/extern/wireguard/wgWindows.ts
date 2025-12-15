@@ -53,6 +53,16 @@ export function checkDLLError(): string {
 
 // 定义 WireGuard API 函数，枚举类型全部使用枚举成员的原始int值代替
 export const WireGuardAPI: CType.wgApi = {
-    set_logger: wg.func("set_logger", CType.c_type.response, [CType.WireGuardLoggerCallback]),
-    create_room: wg.func(""),
+    set_env: wg.func("set_env", koffi.types.void, [koffi.pointer(koffi.types.char)]),
+    set_logger: wg.func("set_logger", koffi.types.void, [koffi.pointer(CType.WireGuardLoggerCallback)]),
+    create_room: wg.func("create_room", CType.c_type.response, [CType.c_type.LPCWSTR, koffi.pointer(koffi.types.uchar), koffi.pointer(koffi.types.uchar),
+        koffi.types.uint16
+    ]),
+    del_room: wg.func("del_room", CType.c_type.response, [CType.c_type.LPCWSTR]),
+    add_peer: wg.func("add_peer", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR, CType.c_type.LPCSTR, koffi.types.uint16,
+        koffi.pointer(koffi.types.uchar), CType.c_type.LPCSTR, koffi.types.uchar
+    ]),
+    del_peer: wg.func("del_peer", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR]),
+    unload: wg.unload
 };
+

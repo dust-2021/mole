@@ -2,6 +2,7 @@ import {app, ipcMain, Menu} from 'electron';
 import {mainWindow} from "./app/window";
 import {initialize} from "./init";
 import {Configs} from './public';
+import { WgHandler } from './extern/wireguard/wireguard';
 
 initialize(ipcMain);
 // Menu.setApplicationMenu(null);
@@ -14,5 +15,8 @@ app.on('window-all-closed', (): void => {
     }
 });
 app.on('before-quit', (): void => {
+    // 保存设置
     Configs.save();
+    // 释放dll库
+    WgHandler.dispose();
 })

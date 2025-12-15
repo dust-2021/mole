@@ -1,9 +1,10 @@
 import path from 'path';
-import {app, ipcMain} from "electron";
+import { app, ipcMain } from "electron";
 import os from 'os';
 import fs = require('fs');
-import {Configs, Logger} from "./public";
-import {handleIPC, natHandler} from "./nat";
+import { Configs, Logger } from "./public";
+import { handleIPC, natHandler } from "./nat";
+import { WgHandler } from './extern/wireguard/wireguard';
 
 // 注册主进程和渲染进程通信接口
 export function initialIPC(ipc: typeof ipcMain) {
@@ -34,6 +35,16 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("setConfig", (Event, name: string, value: any) => {
         Configs.update(name, value);
     })
+
+    // 虚拟局域网相关接口
+    ipc.handle("wireguard-createRoom", (Event, roomName: string) => { return WgHandler.create_room(roomName); })
+    ipc.handle("wireguard-delRoom", (Event, roomName: string) => { return WgHandler.del_room(roomName); })
+    ipc.handle("wireguard-addPeer", (Event, roomName: string, peerName: string, ip: string,
+        port: number, pub_key: string, vlan_ip: string, vlan_mask: number
+    ) => { return WgHandler.add_peer(roomName, peerName, ip, port, pub_key, vlan_ip, vlan_mask); })
+    ipc.handle("wireguard-delPeer", (Event, roomName: string, peerName: string) => { return WgHandler.del_peer(roomName, peerName); })
+    ipc.handle("wireguard-publicKey", (Event) => { return Buffer.from(WgHandler.public_key).toString('base64'); })
+
 }
 
 function getMacAddress(): string {

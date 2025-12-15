@@ -1,7 +1,8 @@
-import {wsRequest, wsHandleFunc} from '../../conn'
+import {wsRequest, wsHandleFunc} from '../../conn';
+import {wireguardFunc} from '../../publicType';
 
 export async function roomIn(server: string, roomId: string, password?: string, handle?: wsHandleFunc) {
-    await wsRequest(server, 'room.in', [roomId, password].filter(e => e !== undefined), handle);
+    await wsRequest(server, 'room.in', [roomId, await wireguardFunc.getPublicKey(), password].filter(e => e !== undefined), handle);
 }
 
 export async function roomOut(server: string, roomId: string, handle?: wsHandleFunc) {
@@ -29,5 +30,5 @@ export async function roomCreate(server: string, conf: {
                                      ipBlackList: string[], userIdBlackList: number[], deviceBlackList: string[], autoClose: boolean
                                  },
                                  handle?: wsHandleFunc) {
-    await wsRequest(server, 'room.create', [conf], handle);
+    await wsRequest(server, 'room.create', [conf, await wireguardFunc.getPublicKey()], handle);
 }

@@ -3,13 +3,14 @@ node_modules/
 locals/
 .idea
 .vscode
-lib/
-!lib/src/wireguard_handle.dll
-!lib/src/wireguard.*
-!lib/src/wireguard-amd64-0.5.3.msi
-!lib/wireguard_handle.cpp
 
+# 
 *.pdb
+*.obj
+*.ilk
+*.exp
+*.lib
+*.exe
 
 
 auto-imports.d.ts

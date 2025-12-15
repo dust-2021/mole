@@ -1,8 +1,8 @@
-import {Services} from "./stores";
-import {wsReq, wsResp, log} from './publicType'
-import {ElMessage} from "element-plus";
-import {v4 as uuid} from "uuid";
-import {AsyncMap, RWLock} from '../../shared/asynchronous'
+import { Services } from "./stores";
+import { wsReq, wsResp, log } from './publicType'
+import { ElMessage } from "element-plus";
+import { v4 as uuid } from "uuid";
+import { AsyncMap, RWLock } from '../../shared/asynchronous'
 
 // ws响应处理函数类型，传入当前服务器ws连接类和ws报文
 export type wsHandleFunc = (resp: wsResp) => any;
@@ -11,7 +11,7 @@ export type wsHandleFunc = (resp: wsResp) => any;
 * */
 export class Connection {
     static All: Map<string, Connection> = new Map();
-    private conn: WebSocket = null;
+    private conn: WebSocket | null = null;
     private readonly lock = new RWLock();
     private handleByMethod = new AsyncMap<wsHandleFunc>(this.lock);
     private handleById = new AsyncMap<wsHandleFunc>(this.lock);
@@ -46,33 +46,36 @@ export class Connection {
 
     public async active(): Promise<boolean> {
         const release = await this.lock.acquireWrite();
-        if (this.conn && this.conn.readyState === this.conn.OPEN) {
-            release();
-            return true;
-        }
-        const svr = Services().get(this.serverName);
         try {
+            if (this.conn && this.conn.readyState === this.conn.OPEN) {
+                return true;
+            }
+            const svr = Services().get(this.serverName);
+            if (svr == undefined) {
+                return false;
+            }
             this.conn = await Connection.createConn(`${svr.certify ? 'https://' : 'http://'}${svr.host}:${svr.port}/ws`);
+
+            this.conn.onmessage = this.handle.bind(this);
+            this.conn.onerror = (event) => {
+                // Logger.error("wsError:" + event.message)
+            }
+            this.conn.onclose = () => {
+                log('info', 'connection closed');
+            }
+            return true;
         } catch (e) {
             log('error', `create ws connection failed:${e.toString()}`)
-            release();
             return false;
+        } finally {
+            release();
         }
-        this.conn.onmessage = this.handle.bind(this);
-        this.conn.onerror = (event) => {
-            // Logger.error("wsError:" + event.message)
-        }
-        this.conn.onclose = () => {
-            log('info', 'connection closed');
-        }
-        release();
-        return true;
     }
 
     public close() {
         if (this.conn && this.conn.readyState === this.conn.OPEN) {
-            this.lock.acquireWrite().then((f)=> {
-                this.conn.close();
+            this.lock.acquireWrite().then((f) => {
+                this.conn?.close();
                 this.conn = null;
                 f();
             });
@@ -96,7 +99,7 @@ export class Connection {
             return;
         }
         const r: wsResp = JSON.parse(data);
-        let f: wsHandleFunc;
+        let f: wsHandleFunc | undefined = undefined;
         try {
             // 响应服务器消息
             if (await this.handleByMethod.has(r.method)) {
@@ -128,19 +131,19 @@ export class Connection {
     }
 
     // 添加或删除ws处理函数
-    public methodHandler(key: string, handler?: wsHandleFunc): void {
-        if (handler) {
+    public methodHandler(key: string, handler: wsHandleFunc): void {
             this.handleByMethod.set(key, handler).then();
-        } else {
-            this.handleByMethod.delete(key).then();
-        }
+        
+    }
+    public removeMethodHandler(key: string): void {
+        this.handleByMethod.delete(key).then();
     }
 }
 
-export async function wsRequest(serverName: string, method: string, args?: any[], handle?: wsHandleFunc) {
+export async function wsRequest(serverName: string, method: string, args: any[], handle?: wsHandleFunc) {
     const conn = Connection.getInstance(serverName);
     const id: string = uuid().toString();
-    const req: wsReq = {id: id, method: method, params: args}
+    const req: wsReq = { id: id, method: method, params: args }
     await conn.send(req, handle);
     return id;
 }

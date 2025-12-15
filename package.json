@@ -9,10 +9,12 @@
   "build": {
     "extraFiles": [
       {
-        "from": "lib/wireguard/amd64/${file}",
+        "from": "lib/wireguard/src/${file}",
         "to": "resources/wireguard/${file}",
         "filter": [
-          "wireguard.dll"
+          "wireguard.dll",
+          "wireguard_handle.dll",
+          "wireguard-amd64-0.5.3.msi"
         ]
       }
     ]
@@ -22,6 +24,7 @@
   "license": "ISC",
   "description": "mole for NAT",
   "devDependencies": {
+    "@types/base64-url": "^2.2.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/electron": "^1.4.38",
     "@types/node": "^22.13.4",
@@ -44,6 +47,7 @@
     "getmac": "^6.6.0",
     "koffi": "^2.14.0",
     "pinia": "^3.0.2",
+    "tweetnacl": "^1.0.3",
     "uuid": "^11.1.0",
     "vite": "^6.1.1",
     "vue-router": "^4.5.0",
