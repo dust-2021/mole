@@ -132,8 +132,8 @@ export class Connection {
 
     // 添加或删除ws处理函数
     public methodHandler(key: string, handler: wsHandleFunc): void {
-            this.handleByMethod.set(key, handler).then();
-        
+        this.handleByMethod.set(key, handler).then();
+
     }
     public removeMethodHandler(key: string): void {
         this.handleByMethod.delete(key).then();

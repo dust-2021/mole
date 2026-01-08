@@ -1,8 +1,16 @@
 import {wsRequest, wsHandleFunc} from '../../conn'
 import {Services, MacAddress} from "../../stores";
 
-export async function serverTime(t: number, handle?: wsHandleFunc) {
+export async function ping(server: string, handle?: wsHandleFunc) {
+    const svr = Services().get(server);
+    if (!svr) return;
+    await wsRequest(server, 'base.ping', [Date.now()], handle);
+}
 
+export async function serverTime(server: string, handle?: wsHandleFunc) {
+    const svr = Services().get(server);
+    if (!svr) return;
+    await wsRequest(server, 'base.serverTime', [], handle);
 }
 
 //

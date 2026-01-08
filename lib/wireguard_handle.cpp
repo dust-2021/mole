@@ -39,6 +39,7 @@ static constexpr size_t allowed_ip_size = sizeof(WIREGUARD_ALLOWED_IP);
 // 外部日志函数钩子
 static void (*log_func)(WIREGUARD_LOGGER_LEVEL level, const char *msg) = nullptr;
 
+// 用于wireguard日志回调转换
 void log_dll(const WIREGUARD_LOGGER_LEVEL level, int64_t dt, const wchar_t *msg)
 {
     if (log_func == nullptr)
@@ -60,32 +61,6 @@ void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg)
         return;
     }
     log_func(level, msg);
-}
-
-std::wstring GetErrorMessage(const DWORD errorCode)
-{
-    // 获取错误消息的缓冲区大小
-    const auto msgBuffer = static_cast<wchar_t *>(malloc(256));
-    const DWORD size = FormatMessageW(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-        nullptr,
-        errorCode,
-        0,
-        msgBuffer,
-        0,
-        nullptr);
-
-    std::wstring msgW;
-    if (size)
-    {
-        msgW = std::wstring(msgBuffer, size);
-    }
-    else
-    {
-        msgW = L"Unknown error code: " + std::to_wstring(errorCode);
-    }
-    free(msgBuffer);
-    return msgW;
 }
 
 enum ffi_error_code
@@ -174,17 +149,8 @@ class wireguard_adapter : public std::enable_shared_from_this<wireguard_adapter>
                 allowed_ip.AddressFamily = AF_INET;
             }
             else
-            // TODO ipv6是否必要
             {
-                result = inet_pton(AF_INET6, temp.first.c_str(), &allowed_ip.Address.V6);
-                if (result == 1)
-                {
-                    allowed_ip.AddressFamily = AF_INET6;
-                }
-                else
-                {
-                    return 0;
-                }
+                return 0;
             }
             memcpy(reinterpret_cast<BYTE *>(conf) + offset, &allowed_ip, allowed_ip_size);
             offset += allowed_ip_size;
@@ -213,28 +179,20 @@ public:
             return false;
         }
         // 设置配置
-        const auto f = WireGuardSetConfiguration(handle, static_cast<WIREGUARD_INTERFACE *>(conf), size_of_config);
-        if (!f)
-        {
-            const auto r = GetLastError();
-            log_dll(WIREGUARD_LOG_ERR, 0, GetErrorMessage(r).c_str());
-        }
-        return f;
+        if (WireGuardSetConfiguration(handle, static_cast<WIREGUARD_INTERFACE *>(conf), size_of_config))
+            return true;
+        auto r = GetLastError();
+        log(WIREGUARD_LOG_ERR, ("set configuration failed code:" + std::to_string(r)).c_str());
+        return false;
     }
 
     // 设置适配器状态
     bool adapter_state(const bool state) const
     {
-        auto flag = WireGuardSetAdapterState(handle, state ? WIREGUARD_ADAPTER_STATE_UP : WIREGUARD_ADAPTER_STATE_DOWN);
-        if (flag)
-        {
+        if (WireGuardSetAdapterState(handle, state ? WIREGUARD_ADAPTER_STATE_UP : WIREGUARD_ADAPTER_STATE_DOWN))
             return true;
-        }
-        auto code = GetLastError();
-        if (code != 0)
-        {
-            log_dll(WIREGUARD_LOG_ERR, 0, GetErrorMessage(code).c_str());
-        }
+        auto r = GetLastError();
+        log(WIREGUARD_LOG_ERR, ("set adapter state failed code:" + std::to_string(r)).c_str());
         return false;
     }
 
@@ -261,30 +219,47 @@ public:
             return false;
         }
         WIREGUARD_PEER new_peer = {};
+        new_peer.PersistentKeepalive = 15;
         new_peer.Endpoint = endpoint;
         memcpy(new_peer.PublicKey, public_key, WIREGUARD_KEY_LENGTH);
-        new_peer.Flags = WIREGUARD_PEER_HAS_PUBLIC_KEY | WIREGUARD_PEER_HAS_ENDPOINT;
+        new_peer.Flags = WIREGUARD_PEER_HAS_PUBLIC_KEY | WIREGUARD_PEER_HAS_ENDPOINT | WIREGUARD_PEER_HAS_PERSISTENT_KEEPALIVE;
         new_peer.AllowedIPsCount = 1;
         peers[peer_name] = new_peer;
         interface_config.PeersCount = peers.size();
         peer_transport[peer_name] = transport_ip;
-        return true;
+        return set_config();
     }
 
-    // 删除成员
-    void del_peer(const std::wstring &peer_name)
+    // 标记peer为删除状态，重新设置配置，然后删除成员
+    _NODISCARD bool del_peer(const std::wstring &peer_name)
     {
+        if (peers.find(peer_name) == peers.end())
+        {
+            return true;
+        }
+        peers[peer_name].Flags = WIREGUARD_PEER_REMOVE;
+        if (!set_config())
+        {
+            log(WIREGUARD_LOG_ERR, "set config failed");
+            return false;
+        }
         peers.erase(peer_name);
         peer_transport.erase(peer_name);
         interface_config.PeersCount = peers.size();
+        return true;
     }
 
     bool run()
     {
-        return set_config() && adapter_state(true);
+        if (!set_config())
+        {
+            log(WIREGUARD_LOG_ERR, "set config failed");
+            return false;
+        }
+        return adapter_state(true);
     }
 
-    bool close() const
+    bool pause() const
     {
         return adapter_state(false);
     }
@@ -413,17 +388,35 @@ public:
             endpoint.Ipv4 = addr;
             endpoint.si_family = AF_INET;
         }
-        return adapters[adapter_name]->add_peer(peer_name, endpoint, pub_key, transport_ip) && adapters[adapter_name]->set_config();
+        return adapters[adapter_name]->add_peer(peer_name, endpoint, pub_key, transport_ip);
     }
 
+    // 删除适配器中的成员
     bool del_peer(const wchar_t *adapter_name, const wchar_t *peer_name)
     {
         if (adapters.find(adapter_name) == adapters.end())
         {
             return false;
         }
-        adapters[adapter_name]->del_peer(peer_name);
-        return adapters[adapter_name]->set_config();
+        return adapters[adapter_name]->del_peer(peer_name);
+    }
+
+    bool run_adapter(const wchar_t *name)
+    {
+        if (adapters.find(name) == adapters.end())
+        {
+            return false;
+        }
+        return adapters[name]->run();
+    }
+
+    bool pause_adapter(const wchar_t *name)
+    {
+        if (adapters.find(name) == adapters.end())
+        {
+            return false;
+        }
+        return adapters[name]->pause();
     }
 };
 
@@ -444,7 +437,7 @@ extern "C"
      * 设置全局日志回调
      * @param cb: 回调函数指针
      */
-    EXPORT void set_logger(void(*cb)(WIREGUARD_LOGGER_LEVEL level, const char * msg))
+    EXPORT void set_logger(void (*cb)(WIREGUARD_LOGGER_LEVEL level, const char *msg))
     {
         log_func = cb;
     }
@@ -453,23 +446,14 @@ extern "C"
      * 创建vlan房间
      * @param name: 房间名 @param public_key: 32位uint8类型的ed25519公钥 @param private_key: 32位uint8类型的ed25519私钥 @param port: 本机转发端口
      */
-    EXPORT response create_room(const wchar_t *name, const u_char *public_key, const u_char *private_key, uint16_t port)
+    EXPORT response create_adapter(const wchar_t *name, const u_char *public_key, const u_char *private_key, uint16_t port)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-        {
             return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        }
         auto ptr = handle.create_adapter(name, public_key, private_key, port);
         if (ptr == nullptr)
-        {
             return {ffi_adapter_create_err, L"create adapter failed"};
-        }
-        if (!ptr->run())
-        {
-            handle.del_adapter(name);
-            return {ffi_adapter_run_err, L"adapter run failed"};
-        }
         return {ffi_success, L"success"};
     }
 
@@ -477,13 +461,11 @@ extern "C"
      * 删除房间
      * @param name: 房间名
      */
-    EXPORT response del_room(const wchar_t *name)
+    EXPORT response del_adapter(const wchar_t *name)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-        {
             return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        }
         handle.del_adapter(name);
         return {ffi_success, L"success"};
     }
@@ -498,13 +480,9 @@ extern "C"
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-        {
             return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        }
         if (!handle.add_peer(adapter_name, peer_name, public_key, ip, port, {transport_ip, mask}))
-        {
             return {ffi_add_peer_err, L"add peer failed"};
-        }
         return {ffi_success, L"success"};
     }
 
@@ -512,14 +490,30 @@ extern "C"
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-        {
             return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        }
         handle.del_peer(adapter_name, peer_name);
         return {ffi_success, L"success"};
     }
-}
 
+    EXPORT response run_adapter(const wchar_t *name)
+    {
+        auto &handle = WireGuardHandle::getInstance();
+        if (wg == nullptr)
+            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
+        if (!handle.run_adapter(name))
+            return {ffi_adapter_run_err, L"adapter run failed"};
+        return {ffi_success, L"success"};
+    }
+
+    EXPORT response pause_adapter(const wchar_t *name)
+    {
+        auto &handle = WireGuardHandle::getInstance();
+        if (wg == nullptr)
+            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
+        handle.pause_adapter(name);
+        return {ffi_success, L"success"};
+    }
+}
 namespace test
 {
     void __stdcall test_log(const WIREGUARD_LOGGER_LEVEL level, const char *msg)
@@ -535,7 +529,7 @@ namespace test
 
     void set_logger()
     {
-        log_func = test_log;
+        log_func = &test_log;
     }
 
     // 测试配置是否成功，数据格式是否完整
@@ -567,6 +561,7 @@ namespace test
 
 int main()
 {
+    env = "debug-dll";
     test::set_logger();
     auto &handle = WireGuardHandle::getInstance();
     // ed25519公私钥
@@ -594,7 +589,7 @@ int main()
     }
 
     test::check_conf(adapter);
-    if (!adapter->close())
+    if (!adapter->pause())
     {
         log(WIREGUARD_LOG_ERR, "adapter close failed");
     }

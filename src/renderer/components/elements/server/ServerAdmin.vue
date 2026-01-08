@@ -16,7 +16,9 @@ const props = defineProps({
   <div>
     <el-aside style="width: 30%">
       <el-scrollbar>
-
+        <el-row>
+          <el-button>添加用户</el-button>
+        </el-row>
       </el-scrollbar>
     </el-aside>
 

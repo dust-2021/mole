@@ -1,5 +1,4 @@
 import {fetch} from "../../request";
-import {ElMessage} from "element-plus";
 
 export async function serverTime(serverName: string): Promise<number | null> {
     const resp = await fetch(serverName, 'get', 'api/server/time', false);
@@ -22,14 +21,25 @@ export interface roomInfo {
 }
 
 // 获取房间列表信息，失败则返回null
-export async function roomList(serverName: string, page: number = 1, size: number = 10): Promise<{
+export async function roomList(serverName: string, page: number = 1, size: number = 10): Promise<{code: number, data :{
     total: number,
     rooms: roomInfo[]
-} | null> {
+}}> {
     const data = new Map<string, any>([['page', page], ['size', size]]);
     const resp = await fetch(serverName, 'get', 'ws/room/list', true, data);
     if (resp.code !== 0) {
-        return null;
+        return {code: resp.code, data: {total: 0, rooms: []}};
     }
-    return resp.data;
+    return {code: 0, data: resp.data};
+}
+
+
+export async function wgInfo(serverName: string): Promise<{code: number, data: {publicKey: string, listenPort: number,
+    vlanIp: string
+}}> {
+    const resp = await fetch(serverName, 'get', 'sapi/info/wginfo', true);
+    if (resp.code !== 0) {
+        return {code: resp.code, data: {publicKey: "", listenPort: 0, vlanIp: ""}};
+    }
+    return {code: 0, data: resp.data};
 }

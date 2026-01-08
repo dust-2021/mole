@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {onBeforeMount, ref, computed} from "vue";
-import {server, wsResp} from "../../../utils/publicType";
+import {getErrMsg, server, wsResp} from "../../../utils/publicType";
 import {roomIn} from '../../../utils/api/ws/room'
 import {roomList, roomInfo} from '../../../utils/api/http/server'
 import {Connection, Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
@@ -22,22 +22,24 @@ let info = ref<{ total: number, rooms: roomInfo[] }>({total: 0, rooms: []});
 const pageSize = ref<number>(10);
 const curPage = ref<number>(1);
 const services = Services();
-const svr = ref<server>(null);
+const svr = ref<server>({
+  host: "", port: 0, certify: false, users: []
+});
 const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
-  const resp: { total: number, rooms: roomInfo[] } | null = await roomList(props.serverName, curPage.value, pageSize.value);
-  if (resp === null) {
+  const resp = await roomList(props.serverName, curPage.value, pageSize.value);
+  if (resp.code !== 0) {
     ElMessage({
       type: "error",
-      message: "获取房间失败"
+      message: getErrMsg(resp.code)
     })
     return;
   }
-  info.value = resp;
+  info.value = resp.data;
   ElMessage({
     type: "success",
-    message: `获取到${resp.total}个房间信息`
+    message: `获取到${resp.data.total}个房间信息`
   })
 }
 
@@ -62,7 +64,9 @@ const filterRooms = computed(() => {
 
 
 onBeforeMount(() => {
-  svr.value = services.get(props.serverName);
+  const s = services.get(props.serverName);
+  if (!s) return;
+  svr.value = s;
   getRoomInfo();
   mounted.value = true;
 });

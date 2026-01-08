@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {server, user} from '../../../utils/publicType'
+import {getErrMsg, server, user} from '../../../utils/publicType'
 import {Services} from "../../../utils/stores";
 import {login} from '../../../utils/api/http/user'
 import {ref, onBeforeMount, toRaw} from "vue";
@@ -7,19 +7,23 @@ import {useRouter} from "vue-router";
 import {Plus, Refresh} from '@element-plus/icons-vue'
 import DangerButton from "../DangerButton.vue";
 import {ElMessageBox, ElMessage} from "element-plus";
-import {Token} from "../../../utils/token";
 
 const isNew = ref(false);
 const svr = Services();
 const name = ref<string>("");
-const newServer = ref<server>(null);
+const newServer = ref<server>({
+  host: "",
+  port: 0,
+  certify: false,
+  users: []
+});
 const mounted = ref(false);
 const router = useRouter();
 
 // 弹出框控制
 const newUserFlag = ref<boolean>(false);
 const newUserInfo = ref<user>({
-  username: '', password: ''
+  username: '', password: '', userUuid: ''
 });
 
 function addNewUser() {
@@ -38,7 +42,7 @@ function addNewUser() {
     type: 'success',
     message: `账号添加成功`,
   })
-  newUserInfo.value = {username: '', password: ''}
+  newUserInfo.value = {username: '', password: '', userUuid: ''}
 }
 
 // 传递名字则是修改，否则为新建
@@ -57,7 +61,7 @@ async function add() {
 }
 
 async function remove() {
-  if (isNew.value) {
+  if (isNew.value || !props.serverName) {
     return;
   }
   svr.delete(props.serverName);
@@ -66,18 +70,19 @@ async function remove() {
 
 // 选项卡切换默认账号时重新登录并修改
 async function changeDefaultUser(u: user) {
-  if (newServer.value.defaultUser && u.username === newServer.value.defaultUser.username) {
+  if (newServer.value.defaultUser && u.username === newServer.value.defaultUser.username || !props.serverName) {
     return;
   }
-  const token: Token = await login(props.serverName, u.username, u.password);
-  if (token === null) {
+  const resp = await login(props.serverName, u.username, u.password);
+  if (resp.code !== 0) {
     ElMessage({
       type: 'error',
-      message: '切换账号失败！',
+      message: getErrMsg(resp.code),
     })
     return;
   }
-  newServer.value.token = token;
+  if (!resp.data) return;
+  newServer.value.token = resp.data;
   newServer.value.defaultUser = u;
   ElMessage({
     type: 'success',
@@ -86,15 +91,17 @@ async function changeDefaultUser(u: user) {
 }
 
 async function reLogin() {
-  const token = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
-  if (token === null) {
+  if (!props.serverName || !newServer.value.defaultUser) return;
+  const resp = await login(props.serverName, newServer.value.defaultUser?.username, newServer.value.defaultUser?.password);
+  if (resp.code !== 0) {
     ElMessage({
       type: 'error',
-      message: 'token刷新失败'
+      message: getErrMsg(resp.code),
     })
     return;
   }
-  newServer.value.token = token;
+  if (!resp.data) return;
+  newServer.value.token = resp.data;
   ElMessage({
     type: 'success',
     message: 'token已刷新'
@@ -121,7 +128,8 @@ async function deleteUser(index: number) {
 
 onBeforeMount(() => {
   if (props.serverName && svr.has(props.serverName)) {
-    newServer.value = svr.get(props.serverName);
+    const s = svr.get(props.serverName);
+    if (s) newServer.value = s;
   } else {
     isNew.value = true;
     newServer.value = {certify: false, host: "", port: 80, users: []};

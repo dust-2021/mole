@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, onBeforeMount, computed} from "vue";
+import {ref, onBeforeMount} from "vue";
 import {server} from '../../utils/publicType'
 import {Services} from "../../utils/stores";
 import RoomList from "../elements/room/RoomList.vue";
@@ -13,11 +13,12 @@ const props = defineProps({
   }
 })
 let isMounted = ref(false);
-let svr = ref<server>(null);
+let svr = ref<server| null>(null);
 const services = Services();
 
 onBeforeMount(async () => {
-  svr.value = services.get(props.serverName);
+  const temp = services.get(props.serverName);
+  if( temp ) svr.value = temp;
   isMounted.value = true;
 });
 
@@ -29,7 +30,7 @@ onBeforeMount(async () => {
       <el-tab-pane label="首页" style="height: 100%">
         <RoomList :server-name="props.serverName"></RoomList>
       </el-tab-pane>
-      <el-tab-pane label="管理" v-if="false">
+      <el-tab-pane label="管理" v-if="svr?.token?.permission.find(item => item === 'admin')">
         <ServerAdmin :server-name="props.serverName"></ServerAdmin>
       </el-tab-pane>
       <el-tab-pane label="设置">

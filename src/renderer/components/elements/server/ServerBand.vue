@@ -2,12 +2,11 @@
 
 import {Connection, Loading} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {server, wsResp} from "../../../utils/publicType";
+import {server, wsResp, getErrMsg} from "../../../utils/publicType";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
-import {subscribe, unsubscribe} from "../../../utils/api/ws/channel";
 import {login} from '../../../utils/api/http/user'
-import {auth} from '../../../utils/api/ws/base'
+import {auth, ping as pingApi} from '../../../utils/api/ws/base'
 import {Connection as wsConn} from "../../../utils/conn";
 import {Services} from '../../../utils/stores'
 
@@ -27,11 +26,16 @@ const conn = wsConn.getInstance(props.serverName);
 // 0 未连接 1 连接中 2 已连接
 const connected = ref<number>(0);
 const ping = ref<number>(0);
+let pingTaskId: NodeJS.Timeout | null = null;
 
 // 开启或关闭ws连接
 async function activeCon() {
   if (connected.value === 2) {
-    await unsubscribe(props.serverName, 'time');
+    // 清除定时任务
+    if (pingTaskId) {
+      clearInterval(pingTaskId);
+      pingTaskId = null;
+    };
     conn.close();
     connected.value = 0;
   } else {
@@ -45,52 +49,55 @@ async function activeCon() {
       })
       return;
     }
-    pingTask();
+    
     await auth(props.serverName,  (resp) => {
       if (resp.statusCode !== 0) {
         conn.close();
         connected.value = 0;
         ElMessage({
           type: 'error',
-          message: resp.statusCode === 10201 ? '该账号已连接':'认证失败，连接已断开',
+          message: getErrMsg(resp.statusCode),
         })
       } else {
+        pingTask();
         connected.value = 2;
       }
     });
   }
 }
 
+function pingCallback(resp: wsResp) {
+  const startTime = resp.data as number;
+  const now = Date.now();
+  ping.value = now - startTime;
+}
+
 // 订阅服务器时间事件
 function pingTask() {
-  subscribe(props.serverName, 'time', (resp: wsResp) => {
-    if (resp.statusCode != 0) {
-      ElMessage({
-        type: 'warning',
-        message: '校对服务器时间失败'
-      })
-      return
-    }
-    const data: { timestamp: number } = resp.data;
-    ping.value = Date.now() - data.timestamp;
-  })
+  pingTaskId = setInterval(async () => {
+    await pingApi(props.serverName, pingCallback);
+  }, 2000);
 }
 
 onBeforeMount(() => {
-  login(props.serverName, props.curServer.defaultUser?.username, props.curServer.defaultUser?.password).then((resp) => {
+  const user = props.curServer.defaultUser;
+  if (!user) return;
+  login(props.serverName, user.username, user.password).then((resp) => {
     if (resp !== null) {
       const svr = Services().get(props.serverName);
-      svr.token = resp;
+      if(!svr || !resp.data) return;
+      svr.token = resp.data;
     }
   });
 });
 
 onBeforeUnmount(() => {
-  if (connected.value > 2) {
-    unsubscribe(props.serverName, 'time').then(() => {
-      conn.close();
-    });
-  }
+    // 清除定时任务
+    if (pingTaskId) {
+      clearInterval(pingTaskId);
+      pingTaskId = null;
+    };
+    conn.close();
 })
 
 </script>

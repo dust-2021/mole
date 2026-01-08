@@ -51,6 +51,7 @@ export function ipcOnce(channel: string, func: (...args: any[]) => void) {
 // 账号信息
 export type user = {
     username: string,
+    userUuid: string,
     password: string,
     perm?: string[],
 }
@@ -59,34 +60,33 @@ export type user = {
 export type server = {
     host: string;
     port: number;
+    // 是否为https
     certify: boolean;
     users: user[];
     defaultUser?: user;
     token?: Token;
 }
 
-
-
-// 通知主进程进行nat打洞尝试
-export async function natConnect(address: string, callback?: (resp: boolean) => void) {
-    await ipcInvoke('nat', 'connect', address);
-    if (callback) {
-        ipcOnce(`nat-connect-${address}`, callback);
+// nat打洞相关接口
+export const natFunc = {
+    open: async () => { return await ipcInvoke('nat', 'open'); },
+    close: async () => { return await ipcInvoke('nat', 'close'); },
+    // nat打洞，cb参数为可选的连接结果回调函数
+    connect: async (ip: string, port: number, cb?: (flag: boolean) => void) => {
+        if (cb) {
+            ipcOnce(`nat-connect-${ip}:${port}`, (flag: boolean) => {
+                cb(flag);
+            });
+        }
+        return await ipcInvoke('nat', 'connect', ip, port);
+    },
+    disconnect: async (ip: string, port: number) => { return await ipcInvoke('nat', 'disconnect', ip, port); },
+    onLose: (address: string, func: () => void) => {
+        ipcOnce(`nat-lose-${address}`, func);
+    },
+    removeLose: (address: string, func: () => void) => {
+        ipcRemove(`nat-lose-${address}`, func);
     }
-}
-
-// 通知主进程关闭nat心跳检测
-export async function natDisconnect(address: string) {
-    await ipcInvoke('nat', 'disconnect', address);
-}
-
-// 被动断开nat连接
-export function onNatLose(address: string, func: () => void) {
-    ipcOnce(`nat-lose-${address}`, func)
-}
-
-export function removeNatLose(address: string, func: () => void) {
-    ipcRemove(`nat-lose-${address}`, func)
 }
 
 ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
@@ -97,13 +97,48 @@ ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
 })
 
 export const wireguardFunc = {
-    createRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName) ;},
+    // 创建wireguard房间
+    createRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName); },
+    // 删除wireguard房间
     delRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delRoom", roomName); },
+    // 启动wireguard适配器
+    runAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-runAdapter", roomName); },
+    // 暂停wireguard适配器
+    pauseAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-pauseAdapter", roomName); },
+
     addPeer: async (roomName: string, peerName: string, ip: string, port: number,
         pub_key: string, vlan_ip: string, vlan_mask: number
     ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_mask); },
+    // 删除peer
     delPeer: async (roomName: string, peerName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delPeer", roomName, peerName); },
     // 获取base64编码格式公钥
-    getPublicKey: async () : Promise<string> => {return await ipcInvoke("wireguard-publicKey")}
+    getPublicKey: async (): Promise<string> => { return await ipcInvoke("wireguard-publicKey") }
 }
 
+// =========== Error Code ===========
+
+const errMapping: Map<number, string> = new Map([
+    [-1, "请求失败"],
+    [1, "未知错误"],
+    [10001, "报文格式错误"],
+    [10002, "数据内容错误"],
+    [10003, "超时"],
+    [10004, "未找到"],
+    [10005, "请求过多"],
+    [10006, "已存在"],
+
+    [10101, "无效的Token"],
+    [10102, "错误的Token"],
+    [10103, "黑名单Token"],
+    [10104, "权限不足"],
+    [10105, "IP限制"],
+    [10106, "路由限制"],
+    [10107, "用户限制"],
+
+    [10201, "WebSocket解析失败"],
+    [10202, "WebSocket重复认证"]
+]);
+
+export function getErrMsg(code: number): string {
+    return errMapping.get(code) || `未知错误，错误码：${code}`;
+}

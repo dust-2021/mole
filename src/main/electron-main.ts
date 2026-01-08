@@ -1,6 +1,6 @@
 import {app, ipcMain, Menu} from 'electron';
 import {mainWindow} from "./app/window";
-import {initialize} from "./init";
+import {initialize} from "./ipcApi";
 import {Configs} from './public';
 import { WgHandler } from './extern/wireguard/wireguard';
 

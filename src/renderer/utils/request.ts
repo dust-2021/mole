@@ -18,6 +18,7 @@ function queryFormatter(data: Map<string, any>): string {
 * */
 export async function fetch(serverName: string, method: string, url: string, withToken: boolean, data?: Map<string, any>): Promise<HttpResp> {
     const svr = Services().get(serverName);
+    if (!svr) return { code: -1, message: `未找到服务器：${serverName}` };
     const host = `${svr.certify? 'https://': 'http://'}${svr.host}:${svr.port}`;
     const headers = new AxiosHeaders();
     headers.set("Accept", "application/json");
@@ -47,6 +48,7 @@ export async function fetch(serverName: string, method: string, url: string, wit
     }
     try {
         resp = await axios.request(body);
+        if (!resp) return {code: -1, message: ''};
         // token失效时重新获取
         if (resp.status === 403 || resp.status === 401) {
             resp = await refreshTokenDo(svr, host, body);
@@ -57,7 +59,7 @@ export async function fetch(serverName: string, method: string, url: string, wit
     } catch (e) {
         log('error', e.toString());
         return {
-            code: -1, message: `请求失败 ${e}`
+            code: -1, message: ''
         }
     }
 }
@@ -65,14 +67,16 @@ export async function fetch(serverName: string, method: string, url: string, wit
 // 刷新token并再次发起请求
 async function refreshTokenDo(svr: server, host: string, body: AxiosRequestConfig): Promise<AxiosResponse> {
         const r = await axios.post(`${host}/api/login`, JSON.stringify({
-            username: svr.defaultUser.username,
-            password: svr.defaultUser.password
+            username: svr.defaultUser?.username,
+            password: svr.defaultUser?.password
         }));
         if (r.status !== 200 || r.data.code !== 0) {
             throw new AxiosError("refresh token failed");
         }
         svr.token = new Token(r.data.data);
-        body.headers["Token"] = svr.token?.token;
+        if (body.headers) {
+            body.headers["Token"] = svr.token?.token;
+        }
         return await axios.request(body);
 }
 

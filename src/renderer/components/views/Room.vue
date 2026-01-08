@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {Services} from "../../utils/stores";
-import {server, wsResp, natConnect, natDisconnect, onNatLose, removeNatLose, wireguardFunc} from "../../utils/publicType";
+import {server, wsResp, wireguardFunc, getErrMsg} from "../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
 import Message from "../elements/room/Message.vue";
@@ -10,6 +10,7 @@ import {Connection} from "../../utils/conn";
 import {roomOut, roomMessage, roomForbidden, roomMates} from '../../utils/api/ws/room'
 import {Mutex} from 'async-mutex';
 import IconButton from "../elements/IconButton.vue";
+import { wgInfo } from '../../utils/api/http/server';
 
 const props = defineProps({
   serverName: {
@@ -24,10 +25,12 @@ const props = defineProps({
 
 interface member {
   userId: number,
+  userUuid: string,
   username: string,
   addr: string,
   owner: boolean,
-  vlan: string,
+  vlan: number,
+  publicKey: string
 }
 
 interface message {
@@ -41,7 +44,12 @@ const mounted = ref(false);
 // 本地保存的服务器信息
 const services = Services();
 // 当前服务器信息
-const svr = ref<server>(null);
+const svr = ref<server>({
+  host: '',
+  port: 0,
+  certify: false,
+  users:[]
+});
 // 当前消息
 const messages = ref<message[]>([]);
 // 当前消息同步锁
@@ -49,13 +57,24 @@ const messagesLock: Mutex = new Mutex();
 // 房间成员信息
 const members = ref<Map<number, member>>(new Map());
 // 自己的信息
-const self = ref<member>(null);
+const self = ref<member>({
+  userId: 0,
+  userUuid: '',
+  username: '',
+  addr: '',
+  owner: false,
+  vlan: 0,
+  publicKey: ''
+});
 // 输入框文本
 const inputMessage = ref<string>('');
 const router = useRouter();
 // 房间是否禁止进入
 const forbidden = ref(false);
 const conn = Connection.getInstance(props.serverName);
+
+// 服务器vlan信息
+const wgInfoData = ref<{publicKey: string, listenPort: number, vlanIp: string}>({publicKey: '', listenPort: 0, vlanIp: ''});
 
 async function onMessage(resp: wsResp) {
   const r = await messagesLock.acquire();
@@ -113,12 +132,27 @@ async function sendMessage(): Promise<void> {
 }
 
 function onJoinRoom(resp: wsResp) {
-  const data: { id: number, name: string, owner: boolean, addr: string, vlan: string } = resp.data;
+  const data: { id: number, name: string, uuid: string, owner: boolean, addr: string, vlan: number, publicKey: string } = resp.data;
   members.value.set(data.id, {
-    userId: data.id, username: data.name, addr: data.addr, owner: data.owner, vlan: data.vlan
+    userId: data.id, username: data.name, userUuid: data.uuid, addr: data.addr, owner: data.owner, vlan: data.vlan, publicKey: data.publicKey
   });
   messages.value.push({from: 0, text: `${data.name}加入房间`, timestamp: Date.now()});
-  natConnect(data.addr).then();
+  const [ip, portStr] = data.addr.split(':');
+  wireguardFunc.addPeer(
+    props.roomId,
+    data.uuid,
+    ip,
+    parseInt(portStr),
+    data.publicKey, `10.0.${data.vlan >> 8}.${data.vlan & 0xff}`, 24
+  ).then((f: boolean) => {
+    if (!f) {
+      ElMessage({
+        showClose: true,
+        message: `添加局域网失败：${data.name}`,
+        type: 'warning'
+      });
+    }
+  });
 }
 
 function onLeaveRoom(resp: wsResp) {
@@ -128,19 +162,22 @@ function onLeaveRoom(resp: wsResp) {
   if(memberLeft == undefined) {
     return
   }
-  natDisconnect(memberLeft.addr).then(() => {
-  });
+  const [ip, portStr] = memberLeft.addr.split(':');
   members.value.delete(id);
+  wireguardFunc.delPeer(props.roomId, memberLeft.username).then(() => {
+  });
 }
 
 function onOwnerChange(resp: wsResp) {
   const data: { old: number, new: number } = resp.data;
   const old_ = members.value.get(data.old);
   const new_ = members.value.get(data.new);
-  if (old_ === undefined || new_ === undefined) {
+  if (new_ === undefined) {
     return;
   }
-  old_.owner = false;
+  if (old_ !== undefined) {
+    old_.owner = false;
+  }
   new_.owner = true;
   messages.value.push({from: 0, text: `房主已移交至${new_.username}`, timestamp: Date.now()});
 
@@ -184,9 +221,27 @@ onBeforeMount(async () => {
     })
     return 
   }
+  svr.value = s;
+  const resp = await wgInfo(props.serverName);
+  if (resp.code !== 0) {
+    ElMessage({
+      showClose: true, message: `获取服务器WG信息失败：${getErrMsg(resp.code)}`, type: 'error'
+    })
+    return 
+  }
+  wgInfoData.value = resp.data;
   // 创建虚拟局域网
   await wireguardFunc.createRoom(props.roomId);
-  svr.value = s;
+  await wireguardFunc.runAdapter(props.roomId);
+  if(! await wireguardFunc.addPeer(props.roomId, props.serverName, svr.value.host, wgInfoData.value.listenPort, 
+    wgInfoData.value.publicKey, "10.0.0.1", 16
+  )){
+    ElMessage({
+      showClose: true,
+      message: `添加局域网失败：${self.value.username}`,
+      type: 'warning'
+    });
+  };
   await roomMates(props.serverName, props.roomId,
       (resp: wsResp) => {
         if (resp.statusCode !== 0) {
@@ -197,22 +252,39 @@ onBeforeMount(async () => {
           })
           return
         }
-        for (const item of resp.data) {
+        for (const item of resp.data as [{ id: number, name: string, uuid: string, owner: boolean, addr: string, vlan: number, publicKey: string }]) {
           // 获取自己的账号信息
           if (item.name === svr.value.defaultUser?.username) {
             self.value = {
-              userId: item.id, username: item.name, addr: item.addr, owner: item.owner, vlan: item.vlan
+              userId: item.id, username: item.name, userUuid: item.uuid, addr: item.addr, owner: item.owner, vlan: item.vlan, publicKey: item.publicKey
             }
           } else {
-            natConnect(item.addr).then(() => {
+            const [ip, portStr] = item.addr.split(':');
+            // 初创局域网时使用服务器转发
+            wireguardFunc.addPeer(
+              props.roomId,
+              item.uuid,
+              svr.value.host,
+              wgInfoData.value.listenPort,
+              item.publicKey, `10.0.${item.vlan >> 8}.${item.vlan & 0xff}`, 24
+            ).then((f: boolean) => {
+              if (!f) {
+                ElMessage({
+                  showClose: true,
+                  message: `添加局域网失败：${item.name}`,
+                  type: 'warning'
+                });
+              }
             });
           }
           members.value.set(item.id, {
             userId: item.id,
             username: item.name,
+            userUuid: item.uuid,
             addr: item.addr,
             owner: item.owner,
-            vlan: item.vlan
+            vlan: item.vlan,
+            publicKey: item.publicKey
           })
         }
       });

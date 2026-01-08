@@ -33,7 +33,7 @@ function logger_callback(level: number, msg: string) {
 
 // wireguard日志回调函数类型定义，0-info，1-warning，2-error
 export const WireGuardLoggerCallback = koffi.proto('WireGuardLoggerCallback', koffi.types.void,
-    [koffi.types.uint, koffi.pointer(koffi.types.char)]);
+    [koffi.types.uint, c_type.LPCSTR]);
 export const WireGuardLoggerCallback_R = koffi.register(logger_callback, koffi.pointer(WireGuardLoggerCallback));
 
 export interface wgApi {
@@ -41,11 +41,15 @@ export interface wgApi {
     // 设置dll日志回调函数
     set_logger: (cb: koffi.IKoffiRegisteredCallback) => void,
     // 
-    create_room: (name: string, public_key: Buffer, private_key: Buffer, listen_port: number) => Response,
-    del_room: (name: string) => Response,
+    create_adapter: (name: string, public_key: Buffer, private_key: Buffer, listen_port: number) => Response,
+    del_adapter: (name: string) => Response,
     add_peer: (adapter_name: string, peer_name: string, ip: string, port: number, public_key: Buffer,
         transport_ip: string, mask: number
     ) => Response,
     del_peer: (adapter_name: string, peer_name: string) => Response,
-    unload: () => void
+    // 启动适配器
+    run_adapter: (name: string) => Response,
+    // 停止适配器
+    pause_adapter: (name: string) => Response,
+    unload: () => void,
 }
