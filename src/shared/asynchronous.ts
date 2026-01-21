@@ -49,8 +49,8 @@ export class RWLock {
 }
 
 // 异步安全哈希表，采用读写锁机制，不会递归锁定可变成员
-export class AsyncMap<T> {
-    private map: Map<string, T> = new Map();
+export class AsyncMap<K, V> {
+    private map: Map<K, V> = new Map();
     private readonly lock: RWLock;
 
     public constructor(lock?: RWLock) {
@@ -61,7 +61,7 @@ export class AsyncMap<T> {
         }
     }
 
-    public async get(key: string): Promise<T | undefined> {
+    public async get(key: K): Promise<V | undefined> {
         const release = await this.lock.acquireRead();
         try {
             return this.map.get(key);
@@ -70,7 +70,7 @@ export class AsyncMap<T> {
         }
     }
 
-    public async pop(key: string): Promise<T | undefined> {
+    public async pop(key: K): Promise<V | undefined> {
         const release = await this.lock.acquireWrite();
         try {
             const item = this.map.get(key);
@@ -81,7 +81,7 @@ export class AsyncMap<T> {
         }
     }
 
-    public async has(key: string): Promise<boolean> {
+    public async has(key: K): Promise<boolean> {
         const release = await this.lock.acquireRead();
         try {
             return this.map.has(key);
@@ -90,7 +90,7 @@ export class AsyncMap<T> {
         }
     }
 
-    public async set(key: string, value: T): Promise<void> {
+    public async set(key: K, value: V): Promise<void> {
         const release = await this.lock.acquireWrite();
         try {
             this.map.set(key, value);
@@ -99,7 +99,7 @@ export class AsyncMap<T> {
         }
     }
 
-    public async delete(key: string): Promise<void> {
+    public async delete(key: K): Promise<void> {
         const release = await this.lock.acquireWrite();
         try {
             this.map.delete(key);
@@ -109,7 +109,7 @@ export class AsyncMap<T> {
     }
 
     // 获取原始map数据，在锁定写入状态下执行
-    public async withLock(func: (v: Map<string, T>) => void): Promise<void> {
+    public async withLock(func: (v: Map<K, V>) => void): Promise<void> {
         const release = await this.lock.acquireWrite();
         try{
             func(this.map);
@@ -119,7 +119,7 @@ export class AsyncMap<T> {
     }
 
     // 获取原始map数据，在锁定读取状态下执行
-    public async withRLock(func: (v: Map<string, T>) => void): Promise<void> {
+    public async withRLock(func: (v: Map<K, V>) => void): Promise<void> {
         const release = await this.lock.acquireRead();
         try {
             func(this.map);

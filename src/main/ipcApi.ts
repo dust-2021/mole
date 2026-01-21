@@ -43,13 +43,13 @@ export function initialIPC(ipc: typeof ipcMain) {
     })
 
     // 虚拟局域网相关接口
-    ipc.handle("wireguard-createRoom", (Event, roomName: string) => { return WgHandler.create_room(roomName); })
+    ipc.handle("wireguard-createRoom", (Event, roomName: string, ip) => { return WgHandler.create_room(roomName, ip); })
     ipc.handle("wireguard-delRoom", (Event, roomName: string) => { return WgHandler.del_room(roomName); })
     ipc.handle("wireguard-runAdapter", (Event, roomName: string) => { return WgHandler.run_adapter(roomName); })
     ipc.handle("wireguard-pauseAdapter", (Event, roomName: string) => { return WgHandler.pause_adapter(roomName); })
     ipc.handle("wireguard-addPeer", (Event, roomName: string, peerName: string, host: string,
-        port: number, pub_key: string, vlan_ip: string, vlan_mask: number
-    ) => { return WgHandler.add_peer(roomName, peerName, host, port, pub_key, vlan_ip, vlan_mask); })
+        port: number, pub_key: string, vlan_ip: [string], vlan_ip_count: number
+    ) => { return WgHandler.add_peer(roomName, peerName, host, port, pub_key, vlan_ip, vlan_ip_count); })
     ipc.handle("wireguard-delPeer", (Event, roomName: string, peerName: string) => { return WgHandler.del_peer(roomName, peerName); })
     ipc.handle("wireguard-publicKey", (Event) => { return Buffer.from(WgHandler.public_key).toString('base64'); })
 

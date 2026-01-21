@@ -3,10 +3,12 @@ import {onBeforeMount, ref, computed} from "vue";
 import {getErrMsg, server, wsResp} from "../../../utils/publicType";
 import {roomIn} from '../../../utils/api/ws/room'
 import {roomList, roomInfo} from '../../../utils/api/http/server'
-import {Connection, Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
+import { Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
 import {ElMessage, ElMessageBox} from "element-plus";
 import {useRouter} from 'vue-router';
+import { roomer } from "../../../utils/roomController";
+import { Connection } from "../../../utils/conn";
 
 const props = defineProps(
     {
@@ -78,7 +80,7 @@ function inputPassword(roomId: string): void {
     inputPattern: /\w+/,
     inputErrorMessage: "格式错误"
   }).then(async ({value}) => {
-    await roomIn(props.serverName, roomId, value.length === 0 ? undefined : value, (resp: wsResp) => {
+    await roomIn(props.serverName, roomId, value.length === 0 ? undefined : value, async (resp: wsResp) => {
       if (resp.statusCode !== 0) {
         ElMessage({
           showClose: true,
@@ -86,7 +88,16 @@ function inputPassword(roomId: string): void {
           type: "warning",
         } as any)
         return
+      };
+      const mates: { id: number, name: string, uuid: string, owner: boolean, addr: string, vlan: number, publicKey: string }[] = resp.data;
+      const  room = await roomer.createRoom(Connection.getInstance(props.serverName), roomId, props.serverName);
+      if (!room) {
+        ElMessage({
+          showClose: true, message: "初始化房间失败", type: "error"
+        })
+        return;
       }
+      room.addMember(mates.map((m) => {return {userId: m.id, userUuid: m.uuid, username: m.name, addr: m.addr, vlan: m.vlan, owner: m.owner, publicKey: m.publicKey}}))
       router.push(`/server/room/page/${props.serverName}/${roomId}`)
     })
   })

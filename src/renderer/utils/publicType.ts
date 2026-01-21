@@ -65,6 +65,9 @@ export type server = {
     users: user[];
     defaultUser?: user;
     token?: Token;
+    wgInfo?: {publicKey: string, listenPort: number,
+    vlanIp: [number, number]
+}
 }
 
 // nat打洞相关接口
@@ -98,7 +101,7 @@ ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
 
 export const wireguardFunc = {
     // 创建wireguard房间
-    createRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName); },
+    createRoom: async (roomName: string, ip: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName, ip); },
     // 删除wireguard房间
     delRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delRoom", roomName); },
     // 启动wireguard适配器
@@ -107,8 +110,8 @@ export const wireguardFunc = {
     pauseAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-pauseAdapter", roomName); },
 
     addPeer: async (roomName: string, peerName: string, ip: string, port: number,
-        pub_key: string, vlan_ip: string, vlan_mask: number
-    ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_mask); },
+        pub_key: string, vlan_ip: string[], vlan_ip_count: number
+    ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_ip_count); },
     // 删除peer
     delPeer: async (roomName: string, peerName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delPeer", roomName, peerName); },
     // 获取base64编码格式公钥

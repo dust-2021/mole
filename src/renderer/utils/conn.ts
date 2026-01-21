@@ -5,16 +5,20 @@ import { v4 as uuid } from "uuid";
 import { AsyncMap, RWLock } from '../../shared/asynchronous'
 
 // ws响应处理函数类型，传入当前服务器ws连接类和ws报文
-export type wsHandleFunc = (resp: wsResp) => any;
+export type wsHandleFunc = (resp: wsResp) => void;
 
 /* ws连接管理，每个服务器名会生成一个连接单例
+所有连接共有一个publicHandleByMethod回调处理函数表，私有handleByMethod，handleById回调处理函数表，回调请求只会
+处理一次，id > method > publicMethod
 * */
 export class Connection {
     static All: Map<string, Connection> = new Map();
+    public static publicHandleByMethod = new AsyncMap<string, wsHandleFunc>();
+
     private conn: WebSocket | null = null;
     private readonly lock = new RWLock();
-    private handleByMethod = new AsyncMap<wsHandleFunc>(this.lock);
-    private handleById = new AsyncMap<wsHandleFunc>(this.lock);
+    private handleByMethod = new AsyncMap<string, wsHandleFunc>(this.lock);
+    private handleById = new AsyncMap<string, wsHandleFunc>(this.lock);
 
     private constructor(public serverName: string) {
         const s = Services();
@@ -44,7 +48,7 @@ export class Connection {
         })
     }
 
-    public async active(): Promise<boolean> {
+    public async active(onclose?: ()=> void): Promise<boolean> {
         const release = await this.lock.acquireWrite();
         try {
             if (this.conn && this.conn.readyState === this.conn.OPEN) {
@@ -62,6 +66,7 @@ export class Connection {
             }
             this.conn.onclose = () => {
                 log('info', 'connection closed');
+                if (onclose) onclose();
             }
             return true;
         } catch (e) {
@@ -104,7 +109,10 @@ export class Connection {
             // 响应服务器消息
             if (await this.handleByMethod.has(r.method)) {
                 f = await this.handleByMethod.get(r.method);
-            } else if (await this.handleById.has(r.id)) {
+            } else if (await Connection.publicHandleByMethod.has(r.method)) {
+                f = await Connection.publicHandleByMethod.get(r.method);
+            };
+            if (await this.handleById.has(r.id)) {
                 f = await this.handleById.get(r.id);
             }
             f?.(r);
@@ -130,7 +138,7 @@ export class Connection {
         }
     }
 
-    // 添加或删除ws处理函数
+    // 添加ws处理函数
     public methodHandler(key: string, handler: wsHandleFunc): void {
         this.handleByMethod.set(key, handler).then();
 

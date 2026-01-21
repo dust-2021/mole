@@ -33,12 +33,12 @@ class NatCreator {
     private slaveSoc: dgram.Socket;
     private readonly port: number;
     // 存储心跳检测控制函数和失败计数
-    private heartbeatTarget: AsyncMap<{ call: NodeJS.Timeout, count: number }> = new AsyncMap();
+    private heartbeatTarget: AsyncMap<string, { call: NodeJS.Timeout, count: number }> = new AsyncMap();
     // 存储连接任务和连接超时控制
-    private connecting: AsyncMap<{ task: NodeJS.Timeout, timeout: NodeJS.Timeout }> = new AsyncMap();
+    private connecting: AsyncMap<string, { task: NodeJS.Timeout, timeout: NodeJS.Timeout }> = new AsyncMap();
 
     constructor() {
-        this.port = Configs.natPort;
+        this.port = Configs.wgPort;
         this.soc = dgram.createSocket({type: 'udp4', reuseAddr: true});
         this.slaveSoc = dgram.createSocket('udp4');
         this.soc.on('message', this.listener);

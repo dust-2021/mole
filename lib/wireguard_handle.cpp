@@ -1,6 +1,7 @@
 #include <unordered_map>
 #include <string>
 #include "src/wireguard.h"
+#include "wireguard_tool.cpp"
 #include <memory>
 #include "mutex"
 #include "chrono"
@@ -9,118 +10,22 @@
 #include "winsock2.h"
 #include "ws2tcpip.h"
 
-#include <filesystem>
-
-namespace fs = std::filesystem;
-
 #pragma comment(lib, "ws2_32.lib")
 
 #define EXPORT __declspec(dllexport)
 
-static WIREGUARD_CREATE_ADAPTER_FUNC *WireGuardCreateAdapter;
-static WIREGUARD_OPEN_ADAPTER_FUNC *WireGuardOpenAdapter;
-static WIREGUARD_CLOSE_ADAPTER_FUNC *WireGuardCloseAdapter;
-static WIREGUARD_GET_ADAPTER_LUID_FUNC *WireGuardGetAdapterLUID;
-static WIREGUARD_GET_RUNNING_DRIVER_VERSION_FUNC *WireGuardGetRunningDriverVersion;
-static WIREGUARD_DELETE_DRIVER_FUNC *WireGuardDeleteDriver;
-static WIREGUARD_SET_LOGGER_FUNC *WireGuardSetLogger;
-static WIREGUARD_SET_ADAPTER_LOGGING_FUNC *WireGuardSetAdapterLogging;
-static WIREGUARD_GET_ADAPTER_STATE_FUNC *WireGuardGetAdapterState;
-static WIREGUARD_SET_ADAPTER_STATE_FUNC *WireGuardSetAdapterState;
-static WIREGUARD_GET_CONFIGURATION_FUNC *WireGuardGetConfiguration;
-static WIREGUARD_SET_CONFIGURATION_FUNC *WireGuardSetConfiguration;
-
-static HMODULE wg = nullptr;
-
-static constexpr size_t interface_size = sizeof(WIREGUARD_INTERFACE);
-static constexpr size_t peer_size = sizeof(WIREGUARD_PEER);
-static constexpr size_t allowed_ip_size = sizeof(WIREGUARD_ALLOWED_IP);
-
-// 外部日志函数钩子
-static void (*log_func)(WIREGUARD_LOGGER_LEVEL level, const char *msg) = nullptr;
-
-// 用于wireguard日志回调转换
-void log_dll(const WIREGUARD_LOGGER_LEVEL level, int64_t dt, const wchar_t *msg)
+// 抽象room配置类，对应一个房间和一个wireguard adapter
+class room_config
 {
-    if (log_func == nullptr)
-    {
-        return;
-    }
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, msg, -1, NULL, 0, NULL, NULL);
-    std::string str(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, msg, -1, &str[0], size_needed, NULL, NULL);
-    log_func(level, str.c_str());
-}
-
-static std::string env = "";
-
-void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg)
-{
-    if (log_func == nullptr)
-    {
-        return;
-    }
-    log_func(level, msg);
-}
-
-enum ffi_error_code
-{
-    ffi_success = 0,
-    ffi_wireguard_dll_unload = 1,
-    ffi_adapter_create_err = 2,
-    ffi_adapter_run_err = 3,
-    ffi_add_peer_err = 4,
-};
-
-struct response
-{
-    ffi_error_code code;
-    const wchar_t *msg;
-};
-
-// 加载wireguard动态库
-void initial()
-{
-    auto curdir = fs::current_path();
-    auto dll_dir = L"resource/wireguard/wireguard.dll"; // electron打包完成后
-    if (env == "dev")                                   // electron调试
-    {
-        dll_dir = L"lib/src/wireguard.dll";
-    }
-    else if (env == "debug-dll") // dll调试
-    {
-        dll_dir = L"src/wireguard.dll";
-    }
-    auto fullpath = curdir / dll_dir;
-    wg =
-        LoadLibraryExW(fullpath.c_str(), nullptr,
-
-                       LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (wg == nullptr)
-    {
-        log(WIREGUARD_LOG_INFO, "load wireguard failed");
-        return;
-    }
-#define X(Name) ((*(FARPROC *)&Name = GetProcAddress(wg, #Name)) == NULL)
-    if (X(WireGuardCreateAdapter) || X(WireGuardOpenAdapter) || X(WireGuardCloseAdapter) ||
-        X(WireGuardGetAdapterLUID) || X(WireGuardGetRunningDriverVersion) || X(WireGuardDeleteDriver) ||
-        X(WireGuardSetLogger) || X(WireGuardSetAdapterLogging) || X(WireGuardGetAdapterState) ||
-        X(WireGuardSetAdapterState) || X(WireGuardGetConfiguration) || X(WireGuardSetConfiguration))
-#undef X
-    {
-        return;
-    }
-}
-
-class wireguard_adapter : public std::enable_shared_from_this<wireguard_adapter>
-{
-
-    WIREGUARD_INTERFACE interface_config{};
     // 生成配置数据，返回配置数据指针大小，0则代表生成失败
     size_t generate_config()
     {
-        size_t total_size = interface_size + peers.size() * peer_size + peer_transport.size() * allowed_ip_size;
-
+        size_t total_size = interface_size + peers.size() * peer_size;
+        // 添加每个peer的allowed_ip大小
+        for (const auto &[k, v] : peer_allowed_ips)
+        {
+            total_size += peer_allowed_ips[k].size() * allowed_ip_size;
+        }
         const auto new_ptr = realloc(conf, total_size);
         if (new_ptr == nullptr)
         {
@@ -135,40 +40,44 @@ class wireguard_adapter : public std::enable_shared_from_this<wireguard_adapter>
         {
             memcpy(reinterpret_cast<BYTE *>(conf) + offset, &peer, peer_size);
             offset += peer_size;
-            // 转发虚拟IP地址错误
-            if (peer.AllowedIPsCount != 1 || peer_transport.find(key) == peer_transport.end())
+            if (peer.AllowedIPsCount == 0)
             {
+                continue;
+            }
+            // 转发虚拟IP地址错误
+            if (peer_allowed_ips.find(key) == peer_allowed_ips.end())
+            {
+                log(WIREGUARD_LOG_ERR, "parse peer transport failed");
                 return 0;
             };
-
-            auto temp = peer_transport[key];
-            WIREGUARD_ALLOWED_IP allowed_ip = {};
-            allowed_ip.Cidr = temp.second;
-            if (int result = inet_pton(AF_INET, temp.first.c_str(), &allowed_ip.Address.V4); result == 1)
+            for (const auto &ip : peer_allowed_ips[key])
             {
-                allowed_ip.AddressFamily = AF_INET;
+                memcpy(reinterpret_cast<BYTE *>(conf) + offset, &ip, allowed_ip_size);
+                offset += allowed_ip_size;
             }
-            else
-            {
-                return 0;
-            }
-            memcpy(reinterpret_cast<BYTE *>(conf) + offset, &allowed_ip, allowed_ip_size);
-            offset += allowed_ip_size;
         }
         return total_size;
     }
 
 public:
     std::wstring name;
+    // wireguard 适配器配置
+    WIREGUARD_INTERFACE interface_config{};
+    // wireguard 适配器对等体配置
     std::unordered_map<std::wstring, WIREGUARD_PEER> peers;
-    // 约定每个peer一个vlan地址
-    std::unordered_map<std::wstring, std::pair<std::string, u_char>> peer_transport;
+    // wireguard 适配器对等体允许的IP配置
+    std::unordered_map<std::wstring, std::vector<WIREGUARD_ALLOWED_IP>> peer_allowed_ips;
 
     // wireguard 适配器匿名句柄
     WIREGUARD_ADAPTER_HANDLE handle = nullptr;
     // 特定内存布局的wireguard配置
     // interface + peer1 + allowed_ip1 + allowed_ip2 + peer2 + allowed + ...
     void *conf = nullptr;
+
+    static constexpr WIREGUARD_INTERFACE_FLAG BASE_FLAG = WIREGUARD_INTERFACE_HAS_LISTEN_PORT | WIREGUARD_INTERFACE_HAS_PRIVATE_KEY |
+                                                          WIREGUARD_INTERFACE_HAS_PUBLIC_KEY;
+    static constexpr WIREGUARD_PEER_FLAG BASE_PEER_FLAG = WIREGUARD_PEER_HAS_PUBLIC_KEY | WIREGUARD_PEER_HAS_ENDPOINT |
+                                                          WIREGUARD_PEER_HAS_PERSISTENT_KEEPALIVE;
 
     // 设置适配器参数
     _NODISCARD bool set_config()
@@ -179,98 +88,27 @@ public:
             return false;
         }
         // 设置配置
-        if (WireGuardSetConfiguration(handle, static_cast<WIREGUARD_INTERFACE *>(conf), size_of_config))
+        if (WireGuardSetConfiguration(handle, static_cast<WIREGUARD_INTERFACE *>(conf), size_of_config) != 0)
             return true;
         auto r = GetLastError();
         log(WIREGUARD_LOG_ERR, ("set configuration failed code:" + std::to_string(r)).c_str());
         return false;
     }
 
-    // 设置适配器状态
-    bool adapter_state(const bool state) const
-    {
-        if (WireGuardSetAdapterState(handle, state ? WIREGUARD_ADAPTER_STATE_UP : WIREGUARD_ADAPTER_STATE_DOWN))
-            return true;
-        auto r = GetLastError();
-        log(WIREGUARD_LOG_ERR, ("set adapter state failed code:" + std::to_string(r)).c_str());
-        return false;
-    }
-
-    wireguard_adapter(const WIREGUARD_ADAPTER_HANDLE &handle, std::wstring name,
-                      const u_char *public_key, const u_char *private_key,
-                      const uint16_t listen_port) noexcept : name(std::move(name)), handle(handle)
+    room_config(const WIREGUARD_ADAPTER_HANDLE &handle, std::wstring name,
+                const u_char *public_key, const u_char *private_key,
+                const uint16_t listen_port) noexcept : name(name), handle(handle)
     {
         memcpy(interface_config.PublicKey, public_key, WIREGUARD_KEY_LENGTH);
         memcpy(interface_config.PrivateKey, private_key, WIREGUARD_KEY_LENGTH);
         interface_config.ListenPort = listen_port;
         interface_config.PeersCount = 0;
 
-        interface_config.Flags = WIREGUARD_INTERFACE_HAS_LISTEN_PORT | WIREGUARD_INTERFACE_HAS_PRIVATE_KEY |
-                                 WIREGUARD_INTERFACE_HAS_PUBLIC_KEY;
+        interface_config.Flags = BASE_FLAG | WIREGUARD_INTERFACE_REPLACE_PEERS;
     };
 
-    // 添加成员
-    _NODISCARD bool add_peer(const std::wstring &peer_name, const SOCKADDR_INET &endpoint, const u_char *public_key,
-                             std::pair<std::string, u_char> transport_ip)
+    ~room_config()
     {
-        if (peers.find(peer_name) != peers.end())
-        {
-            log(WIREGUARD_LOG_ERR, "peer already exists");
-            return false;
-        }
-        WIREGUARD_PEER new_peer = {};
-        new_peer.PersistentKeepalive = 15;
-        new_peer.Endpoint = endpoint;
-        memcpy(new_peer.PublicKey, public_key, WIREGUARD_KEY_LENGTH);
-        new_peer.Flags = WIREGUARD_PEER_HAS_PUBLIC_KEY | WIREGUARD_PEER_HAS_ENDPOINT | WIREGUARD_PEER_HAS_PERSISTENT_KEEPALIVE;
-        new_peer.AllowedIPsCount = 1;
-        peers[peer_name] = new_peer;
-        interface_config.PeersCount = peers.size();
-        peer_transport[peer_name] = transport_ip;
-        return set_config();
-    }
-
-    // 标记peer为删除状态，重新设置配置，然后删除成员
-    _NODISCARD bool del_peer(const std::wstring &peer_name)
-    {
-        if (peers.find(peer_name) == peers.end())
-        {
-            return true;
-        }
-        peers[peer_name].Flags = WIREGUARD_PEER_REMOVE;
-        if (!set_config())
-        {
-            log(WIREGUARD_LOG_ERR, "set config failed");
-            return false;
-        }
-        peers.erase(peer_name);
-        peer_transport.erase(peer_name);
-        interface_config.PeersCount = peers.size();
-        return true;
-    }
-
-    bool run()
-    {
-        if (!set_config())
-        {
-            log(WIREGUARD_LOG_ERR, "set config failed");
-            return false;
-        }
-        return adapter_state(true);
-    }
-
-    bool pause() const
-    {
-        return adapter_state(false);
-    }
-
-    ~wireguard_adapter()
-    {
-        if (handle != nullptr)
-        {
-            WireGuardCloseAdapter(handle);
-            log_dll(WIREGUARD_LOG_INFO, 0, std::wstring(L"adapter closed: ").append(name).c_str());
-        }
         free(conf);
     };
 };
@@ -281,8 +119,6 @@ public:
 class WireGuardHandle
 {
 private:
-    std::unordered_map<std::wstring, std::shared_ptr<wireguard_adapter>> adapters;
-
     static void init()
     {
         // 初始化winsock
@@ -300,13 +136,13 @@ private:
 
     WireGuardHandle()
     {
-        adapters = std::unordered_map<std::wstring, std::shared_ptr<wireguard_adapter>>();
+        rooms = std::unordered_map<std::wstring, std::unique_ptr<room_config>>();
     };
 
 public:
     static WireGuardHandle instance;
     static std::once_flag initInstanceFlag;
-
+    std::unordered_map<std::wstring, std::unique_ptr<room_config>> rooms;
     WireGuardHandle(const WireGuardHandle &) = delete;
 
     WireGuardHandle &operator=(const WireGuardHandle &) = delete;
@@ -326,97 +162,130 @@ public:
     };
 
     // 创建适配器对象，已存在则直接返回
-    _NODISCARD std::shared_ptr<wireguard_adapter> create_adapter(const wchar_t *name, const u_char *public_key,
-                                                                 const u_char *private_key, uint16_t listen_port)
+    _NODISCARD bool create_room(const wchar_t *name, const u_char *public_key,
+                                const u_char *private_key, const char *adapter_ip, uint16_t listen_port)
     {
-        if (adapters.find(name) != adapters.end())
+        if (rooms.find(name) != rooms.end())
         {
-            return adapters[name];
+            return true;
         }
-        auto handle = WireGuardCreateAdapter(name, L"WireGuard", nullptr);
+        auto handle = WireGuardCreateAdapter(name, L"WireGuard Tunnel", nullptr);
         if (handle == nullptr)
         {
-            return nullptr;
+            return false;
         }
-
-        std::shared_ptr<wireguard_adapter> adapter = nullptr;
-
-        adapter = std::make_shared<wireguard_adapter>(handle, name, public_key, private_key, listen_port);
-        adapters[name] = adapter;
-        return adapter;
+        // 创建配置并设置适配器
+        auto conf = std::make_unique<room_config>(handle, name, public_key, private_key, listen_port);
+        if (!conf->set_config() || !bind_adapter(handle, adapter_ip))
+        {
+            WireGuardCloseAdapter(handle);
+            log(WIREGUARD_LOG_ERR, "adapter create failed");
+            return false;
+        }
+        // 去除清空peer的状态码
+        conf->interface_config.Flags = room_config::BASE_FLAG;
+        rooms[name] = std::move(conf);
+        log_dll(WIREGUARD_LOG_INFO, 0, std::wstring(L"adapter created of room:").append(name).c_str());
+        return true;
     };
 
-    void del_adapter(const wchar_t *name)
+    void del_room(const wchar_t *name)
     {
-        if (adapters.find(name) == adapters.end())
+        if (rooms.find(name) == rooms.end())
         {
             return;
         }
-        adapters.erase(name);
+        WireGuardCloseAdapter(rooms[name]->handle);
+        log_dll(WIREGUARD_LOG_INFO, 0, std::wstring(L"adapter deleted of room:").append(name).c_str());
+        rooms.erase(name);
     }
 
     // 添加成员并修改wireguard适配器配置
     _NODISCARD bool add_peer(const wchar_t *adapter_name, const wchar_t *peer_name, const u_char *pub_key,
-                             const char *ip, uint16_t port, std::pair<std::string, u_char> transport_ip)
+                             const char *ip, uint16_t port, const char **allowed_ips, size_t allowed_ip_count)
     {
-        if (adapters.find(adapter_name) == adapters.end())
+        if (rooms.find(adapter_name) == rooms.end())
         {
-            log(WIREGUARD_LOG_ERR, "adapter not exists");
+            log(WIREGUARD_LOG_ERR, "add peer failed for not exist room");
+            return false;
+        };
+        auto &room = rooms[adapter_name];
+        if (room->peers.find(peer_name) != room->peers.end())
+        {
+            log(WIREGUARD_LOG_ERR, "add peer already exists");
             return false;
         }
-        sockaddr_in addr = {};
-        SOCKADDR_INET endpoint = {};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(port);
-        if (int result = inet_pton(AF_INET, ip, &addr.sin_addr); result != 1)
-        // ip6
+        WIREGUARD_PEER new_peer = {};
+        new_peer.PersistentKeepalive = 15;
+        if (!parse_ip(ip, port, new_peer.Endpoint))
         {
-            sockaddr_in6 addr6 = {};
-            addr6.sin6_family = AF_INET6;
-            addr6.sin6_port = htons(port);
-            result = inet_pton(AF_INET6, ip, &addr6.sin6_addr);
-            if (result != 1)
+            log(WIREGUARD_LOG_ERR, "peer endpoint format error");
+            return false;
+        }
+        memcpy(new_peer.PublicKey, pub_key, WIREGUARD_KEY_LENGTH);
+        new_peer.Flags = room_config::BASE_PEER_FLAG;
+        new_peer.AllowedIPsCount = allowed_ip_count;
+        room->peers[peer_name] = new_peer;
+        // 初始化转发IP列表
+        room->interface_config.PeersCount = room->peers.size();
+        room->peer_allowed_ips[peer_name] = std::vector<WIREGUARD_ALLOWED_IP>();
+        for (size_t i = 0; i < allowed_ip_count; i++)
+        {
+            WIREGUARD_ALLOWED_IP allowed_ip = {};
+            if (!parse_allowed_ip(std::string(allowed_ips[i]), allowed_ip))
             {
-                log(WIREGUARD_LOG_ERR, "ip format error");
-                return false;
+                log(WIREGUARD_LOG_ERR, strcat("allowed_ip format failed: ", allowed_ips[i]));
+                goto onfailed;
             }
-            endpoint.Ipv6 = addr6;
-            endpoint.si_family = AF_INET6;
+            room->peer_allowed_ips[peer_name].push_back(allowed_ip);
         }
-        else
+        // 配置失败回退
+        if (!room->set_config())
         {
-            endpoint.Ipv4 = addr;
-            endpoint.si_family = AF_INET;
+        onfailed:
+            room->peers.erase(peer_name);
+            room->peer_allowed_ips.erase(peer_name);
+            room->interface_config.PeersCount = room->peers.size();
+            return false;
         }
-        return adapters[adapter_name]->add_peer(peer_name, endpoint, pub_key, transport_ip);
+        return true;
     }
 
     // 删除适配器中的成员
-    bool del_peer(const wchar_t *adapter_name, const wchar_t *peer_name)
+    void del_peer(const wchar_t *room_name, const wchar_t *peer_name)
     {
-        if (adapters.find(adapter_name) == adapters.end())
+        if (rooms.find(room_name) == rooms.end())
+            return;
+        auto &room = rooms[room_name];
+        if (room->peers.find(peer_name) == room->peers.end())
+            return;
+        // 设置删除
+        room->peers[peer_name].Flags = WIREGUARD_PEER_REMOVE;
+        if (!room->set_config())
         {
-            return false;
+            log(WIREGUARD_LOG_ERR, "remove adapter peer failed");
         }
-        return adapters[adapter_name]->del_peer(peer_name);
+        room->peers.erase(peer_name);
+        room->peer_allowed_ips.erase(peer_name);
+        room->interface_config.PeersCount = room->peers.size();
     }
 
     bool run_adapter(const wchar_t *name)
     {
-        if (adapters.find(name) == adapters.end())
+        if (rooms.find(name) == rooms.end())
         {
             return false;
         }
-        return adapters[name]->run();
+        return WireGuardSetAdapterState(rooms[name]->handle, WIREGUARD_ADAPTER_STATE_UP);
     }
 
     bool pause_adapter(const wchar_t *name)
     {
-        if (adapters.find(name) == adapters.end())
+        if (rooms.find(name) == rooms.end())
         {
             return false;
         }
-        return adapters[name]->pause();
+        return WireGuardSetAdapterState(rooms[name]->handle, WIREGUARD_ADAPTER_STATE_DOWN);
     }
 };
 
@@ -444,17 +313,16 @@ extern "C"
 
     /**
      * 创建vlan房间
-     * @param name: 房间名 @param public_key: 32位uint8类型的ed25519公钥 @param private_key: 32位uint8类型的ed25519私钥 @param port: 本机转发端口
+     * @param name: 房间名 @param public_key: 32位uint8类型的curve25519公钥 @param private_key: 32位uint8类型的curve25519私钥 @param port: 本机转发端口
      */
-    EXPORT response create_adapter(const wchar_t *name, const u_char *public_key, const u_char *private_key, uint16_t port)
+    EXPORT response create_adapter(const wchar_t *name, const u_char *public_key, const u_char *private_key, const char *adapter_ip, uint16_t port)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        auto ptr = handle.create_adapter(name, public_key, private_key, port);
-        if (ptr == nullptr)
-            return {ffi_adapter_create_err, L"create adapter failed"};
-        return {ffi_success, L"success"};
+            return {1, L"wireguard.dll unload"};
+        if (!handle.create_room(name, public_key, private_key, adapter_ip, port))
+            return {1, L"create adapter failed"};
+        return {0, L"success"};
     }
 
     /**
@@ -465,53 +333,61 @@ extern "C"
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        handle.del_adapter(name);
-        return {ffi_success, L"success"};
+            return {1, L"wireguard.dll unload"};
+        handle.del_room(name);
+        return {0, L"success"};
     }
 
     /**
      * 添加房间成员
-     * @param adapter_name: 房间适配器名 @param peer_name: 成员名 @param ip: 成员通信IP @param port: 成员通信端口 @param public_key: 成员ed25519公钥
-     * @param transport_ip: 成员虚拟局域网网转发IP @param mask: 转发IP子网掩码
+     * @param room_name: 房间适配器名 @param peer_name: 成员名 @param ip: 成员通信IP @param port: 成员通信端口 @param public_key: 成员ed25519公钥
+     * @param allowed_ips: 成员虚拟局域网网转发IP @param allowed_ips_count: 转发IP数量
      */
-    EXPORT response add_peer(const wchar_t *adapter_name, const wchar_t *peer_name, const char *ip, const uint16_t port, const u_char *public_key,
-                             const char *transport_ip, u_char mask)
+    EXPORT response add_peer(const wchar_t *room_name, const wchar_t *peer_name, const char *ip, const uint16_t port, const u_char *public_key,
+                             const char **allowed_ips, int allowed_ips_count)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        if (!handle.add_peer(adapter_name, peer_name, public_key, ip, port, {transport_ip, mask}))
-            return {ffi_add_peer_err, L"add peer failed"};
-        return {ffi_success, L"success"};
+            return {1, L"wireguard.dll unload"};
+        if (!handle.add_peer(room_name, peer_name, public_key, ip, port, allowed_ips, allowed_ips_count))
+            return {1, L"add peer failed"};
+        return {0, L"success"};
     }
 
-    EXPORT response del_peer(const wchar_t *adapter_name, const wchar_t *peer_name)
+    EXPORT response del_peer(const wchar_t *room_name, const wchar_t *peer_name)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
-        handle.del_peer(adapter_name, peer_name);
-        return {ffi_success, L"success"};
+            return {1, L"wireguard.dll unload"};
+        handle.del_peer(room_name, peer_name);
+        return {0, L"success"};
     }
 
     EXPORT response run_adapter(const wchar_t *name)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
+            return {1, L"wireguard.dll unload"};
         if (!handle.run_adapter(name))
-            return {ffi_adapter_run_err, L"adapter run failed"};
-        return {ffi_success, L"success"};
+            return {1, L"adapter run failed"};
+        return {0, L"success"};
     }
 
     EXPORT response pause_adapter(const wchar_t *name)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
-            return {ffi_wireguard_dll_unload, L"wireguard.dll unload"};
+            return {1, L"wireguard.dll unload"};
         handle.pause_adapter(name);
-        return {ffi_success, L"success"};
+        return {0, L"success"};
+    }
+
+    EXPORT response get_adapter_config(const wchar_t * name) {
+        auto &handle = WireGuardHandle::getInstance();
+        if (wg == nullptr)
+            return {1, L"wireguard.dll unload"};
+        handle.pause_adapter(name);
+        return {0, L"success"};
     }
 }
 namespace test
@@ -531,32 +407,6 @@ namespace test
     {
         log_func = &test_log;
     }
-
-    // 测试配置是否成功，数据格式是否完整
-    void check_conf(const std::shared_ptr<wireguard_adapter> &adapter)
-    {
-        unsigned long mem_size = 0;
-        mem_size = interface_size + peer_size * adapter->peers.size() + allowed_ip_size * adapter->peers.size();
-        const auto buffer = reinterpret_cast<WIREGUARD_INTERFACE *>(malloc(mem_size));
-        if (!WireGuardGetConfiguration(adapter->handle, buffer, &mem_size))
-        {
-            const auto r = GetLastError();
-            std::cout << "get configuration failed: " << r << std::endl;
-            return;
-        }
-        if (memcmp(adapter->conf, buffer, mem_size) != 0)
-        {
-            std::cout << "unsame mem" << '\n';
-        }
-
-        std::cout << "interface listen port: " << buffer->ListenPort << std::endl;
-        if (buffer->PeersCount != 0)
-        {
-            const auto peer = reinterpret_cast<WIREGUARD_PEER *>(reinterpret_cast<char *>(buffer) + 80);
-            std::cout << peer->PublicKey << '\n';
-        }
-        free(buffer);
-    }
 }
 
 int main()
@@ -566,32 +416,36 @@ int main()
     auto &handle = WireGuardHandle::getInstance();
     // ed25519公私钥
     const u_char pub_key[] = {
-        46, 133, 210, 14, 242, 236, 166, 218, 5, 143, 29, 91, 247, 57, 14, 20, 62, 223, 234, 131, 55, 173, 40, 15, 198, 44, 64, 90, 109, 250, 251, 219};
+        84, 28, 11, 0, 37, 145, 159, 133,
+        154, 18, 242, 47, 200, 53, 112, 25,
+        116, 81, 254, 120, 17, 66, 232, 6,
+        69, 61, 152, 77, 228, 135, 155, 111};
     const u_char pri_key[] = {
-        59, 255, 166, 74, 226, 179, 173, 137, 54, 172, 48, 17, 85, 28, 2, 84, 5, 22, 21, 197, 183, 154, 115, 162, 229, 252, 213, 34, 51, 225, 47, 86};
-    const auto adapter = handle.create_adapter(L"test", pub_key, pri_key, 8080);
-    if (adapter == nullptr)
+        112, 81, 202, 65, 122, 125, 117,
+        158, 137, 213, 59, 159, 25, 184,
+        224, 252, 205, 239, 30, 253, 28,
+        144, 51, 178, 104, 128, 25, 169,
+        103, 252, 146, 65};
+    if (!handle.create_room(L"test", pub_key, pri_key, "10.0.0.0", 8080))
     {
         std::cout << "adapter create failed" << std::endl;
         return 0;
     }
-    if (!adapter->run())
+    if (!handle.run_adapter(L"test"))
     {
         return 0;
     }
-    test::check_conf(adapter);
+    std::cout << "First conf:" << get_wg_conf(handle.rooms[L"test"]->handle) << '\n';
     const u_char peer_key[] = {
         113, 54, 183, 51, 253, 208, 0, 141, 85, 73, 153, 40, 209, 110, 24, 169, 158, 172, 204, 231, 13, 52, 53, 46, 53,
         186, 9, 64, 182, 167, 28, 130};
-    if (const auto ok = handle.add_peer(L"test", L"peer1", peer_key, "192.168.0.100", 8767, {"10.0.0.1", 24}); !ok)
+    const char *allowed_ips[] = {"10.0.0.1/32"};
+    if (const auto ok = handle.add_peer(L"test", L"peer1", peer_key, "192.168.0.100", 8767, allowed_ips, 1); !ok)
     {
         return 0;
     }
 
-    test::check_conf(adapter);
-    if (!adapter->pause())
-    {
-        log(WIREGUARD_LOG_ERR, "adapter close failed");
-    }
+    std::cout << "Second Conf:" << get_wg_conf(handle.rooms[L"test"]->handle) << '\n';
+    handle.del_room(L"test");
     return 0;
 }

@@ -21,10 +21,40 @@ export async function roomForbidden(server: string, roomId: string, to: boolean,
     await wsRequest(server, 'room.forbidden', [roomId, to], handle);
 }
 
+/**
+ * 获取当前成员信息，成功data为 {
+	Name      string `json:"name"`
+	Uuid      string `json:"uuid"`
+	Id        int    `json:"id"`
+	Addr      string `json:"addr"`
+	Owner     bool   `json:"owner"`
+	Vlan      int    `json:"vlan"`
+	PublicKey string `json:"publicKey"`
+}[]
+ * @param server 
+ * @param roomId 
+ * @param handle 
+ */
 export async function roomMates(server: string, roomId: string, handle?: wsHandleFunc) {
     await wsRequest(server, 'room.roommate', [roomId], handle);
 }
 
+/**
+ * 创建房间，成功返回data为 {
+ * roomId：string， mates： {
+	Name      string `json:"name"`
+	Uuid      string `json:"uuid"`
+	Id        int    `json:"id"`
+	Addr      string `json:"addr"`
+	Owner     bool   `json:"owner"`
+	Vlan      int    `json:"vlan"`
+	PublicKey string `json:"publicKey"`
+}[]
+ * }
+ * @param server 
+ * @param conf 
+ * @param handle 
+ */
 export async function roomCreate(server: string, conf: {
                                      title: string, description: string, maxMember: number,
                                      ipBlackList: string[], userIdBlackList: number[], deviceBlackList: string[], autoClose: boolean

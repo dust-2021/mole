@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import {ref, toRaw, watch} from "vue";
+import {ref, Ref, toRaw, watch} from "vue";
 import {wsResp} from "../../../utils/publicType";
 import {roomCreate} from "../../../utils/api/ws/room";
 import DangerButton from "../../elements/DangerButton.vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
+import { roomer } from "../../../utils/roomController";
+import { Connection } from "../../../utils/conn";
 
 const props = defineProps({
   serverName: {
@@ -13,7 +15,9 @@ const props = defineProps({
   }
 })
 
-const formData = ref({
+const formData: Ref<{title: string, description: string, maxMember: number, ipBlackList: string[],
+  userIdBlackList: number[], deviceBlackList: string[], autoClose: boolean, password?: string
+}> = ref({
   title: '',
   description: '',
   maxMember: 16,
@@ -35,16 +39,24 @@ watch(withPassword, (o: boolean, n: boolean) => {
 })
 
 async function submit() {
-  await roomCreate(props.serverName,toRaw(formData.value),(r: wsResp) => {
+  await roomCreate(props.serverName,toRaw(formData.value),async (r: wsResp) => {
     if (r.statusCode !== 0) {
       ElMessage({
+        type: "error", message: "创建失败:" + r.data
+      })
+      return
+    };
+    const data: {roomId: string, mates: {name: string, uuid: string, id: number, addr: string, owner: boolean, vlan: number, publicKey: string}[]} = r.data;
+    const room = await roomer.createRoom(Connection.getInstance(props.serverName), data.roomId, props.serverName);
+    if (room === null) {
+      ElMessage({
         type: "error",
-        message: "创建失败:" + r.data,
+        message: "创建局域网失败",
       })
       return
     }
-    const roomId: string = r.data;
-    router.push(`/server/room/page/${props.serverName}/${roomId}`);
+    await room.addMember(data.mates.map((item) => {return {userId: item.id, username: item.name, userUuid: item.uuid, vlan: item.vlan, publicKey: item.publicKey, owner: item.owner, addr: item.addr}}))
+    router.push(`/server/room/page/${props.serverName}/${data.roomId}`);
   })
 }
 </script>

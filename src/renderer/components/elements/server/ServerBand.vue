@@ -9,6 +9,7 @@ import {login} from '../../../utils/api/http/user'
 import {auth, ping as pingApi} from '../../../utils/api/ws/base'
 import {Connection as wsConn} from "../../../utils/conn";
 import {Services} from '../../../utils/stores'
+import { wgInfo } from "../../../utils/api/http/server";
 
 const router = useRouter()
 const props = defineProps({
@@ -41,7 +42,10 @@ async function activeCon() {
   } else {
     connected.value = 1;
     // 连接失败
-    if (!(await conn.active())) {
+    if (!(await conn.active(()=> {
+      if(pingTaskId) clearInterval(pingTaskId);
+      connected.value = 0;
+    }))) {
       connected.value = 0;
       ElMessage({
         type: 'error',
@@ -79,16 +83,15 @@ function pingTask() {
   }, 2000);
 }
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
   const user = props.curServer.defaultUser;
   if (!user) return;
-  login(props.serverName, user.username, user.password).then((resp) => {
-    if (resp !== null) {
-      const svr = Services().get(props.serverName);
-      if(!svr || !resp.data) return;
-      svr.token = resp.data;
-    }
-  });
+  const resp = await login(props.serverName, user.username, user.password);
+  if (resp === null) return;
+  const svr = Services().get(props.serverName);
+  if(!svr || !resp.data) return;
+  svr.token = resp.data;
+  svr.wgInfo = (await wgInfo(props.serverName)).data;
 });
 
 onBeforeUnmount(() => {

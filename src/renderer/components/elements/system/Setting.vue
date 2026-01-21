@@ -6,7 +6,7 @@ const natPort = ref(8080);
 const logLevel = ref<string>('info');
 
 async function save(key: string, value: any) {
-  await ipcInvoke("setConfig", key, value);
+  
 }
 </script>
 

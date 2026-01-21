@@ -19,9 +19,8 @@ export function sendToFront(type_ : 'info' | 'warning' | 'success' | 'error', ms
 class AppConfig {
     private attribute: Map<string, any>;
     private static readonly path: string = path.join(storePath, 'config.json');
-    private static singleton: AppConfig = new AppConfig();
 
-    private constructor() {
+    public constructor() {
         this.attribute = new Map<string, any>();
         try {
             const mem: [string, any][] = JSON.parse(fs.readFileSync(AppConfig.path, 'utf8'));
@@ -33,18 +32,14 @@ class AppConfig {
         }
     }
 
-    static getInstance(): AppConfig {
-        return AppConfig.singleton;
-    }
-
     get loglevel(): string {
         const v = this.attribute.get('loglevel');
-        return v ? v : 'info';
+        return v !== undefined ? v : 'info';
     }
 
-    get natPort(): number {
-        const port = this.attribute.get('port');
-        return port ? port : 8080;
+    get wgPort(): number {
+        const port = this.attribute.get('wgPort');
+        return port !== undefined ? port : 8080;
     }
 
     public get(name: string): any | undefined {
@@ -52,7 +47,6 @@ class AppConfig {
     }
 
     public update(key: string, value: any) {
-        if (!this.attribute.has(key)) return;
         this.attribute.set(key, value);
     }
 
@@ -63,25 +57,33 @@ class AppConfig {
 }
 
 // app设置
-export const Configs = AppConfig.getInstance();
+export const Configs = new AppConfig();
 
 import winston = require('winston');
 
 // 配置日志记录器
 const logFile = path.join(storePath, 'logs', 'mole.log');
 
-export const Logger = winston.createLogger({
-    level: Configs.loglevel, // 默认日志级别
-    transports: [
-        new winston.transports.Console({format: winston.format.simple()}),  // 控制台输出
-        new winston.transports.File({
+const logOutpot = [];
+
+if(environment === "dev") {
+    logOutpot.push(new winston.transports.Console({format: winston.format.simple()}));
+    Configs.update("loglevel", "debug");
+} else {
+    logOutpot.push(new winston.transports.File({
             filename: logFile, format: winston.format.combine(
                 winston.format.timestamp(),
                 winston.format.printf(({timestamp, level, message}) => `${timestamp} ${level}: ${message}`)
             )
         })  // 日志文件输出
-    ]
+    )
+}
+
+export const Logger = winston.createLogger({
+    level: Configs.loglevel, // 默认日志级别
+    transports: logOutpot
 });
 
-Logger.info(`app run on env: ${environment}`);
+
+Logger.info(`app run on env: ${environment}, log level: ${Configs.loglevel}`);
 

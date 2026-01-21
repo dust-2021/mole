@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {getErrMsg, server, user} from '../../../utils/publicType'
 import {Services} from "../../../utils/stores";
-import {login} from '../../../utils/api/http/user'
+import {login} from '../../../utils/api/http/user';
+import {wgInfo} from '../../../utils/api/http/server';
 import {ref, onBeforeMount, toRaw} from "vue";
 import {useRouter} from "vue-router";
 import {Plus, Refresh} from '@element-plus/icons-vue'
 import DangerButton from "../DangerButton.vue";
-import {ElMessageBox, ElMessage} from "element-plus";
+import {ElMessageBox, ElMessage, ElText, ElFormItem} from "element-plus";
 
 const isNew = ref(false);
 const svr = Services();
@@ -105,7 +106,11 @@ async function reLogin() {
   ElMessage({
     type: 'success',
     message: 'token已刷新'
-  })
+  });
+  // 刷新wg信息
+  const resp2 = await wgInfo(props.serverName);
+  if (resp2.code !== 0) return;
+  newServer.value.wgInfo = resp2.data;
 }
 
 async function deleteUser(index: number) {
@@ -194,6 +199,11 @@ onBeforeMount(() => {
           </template>
         </el-dialog>
       </el-form-item>
+      <el-form-item label="公钥">
+        <ElText>{{ newServer.wgInfo?.publicKey }}</ElText>
+      </el-form-item>
+      <ElFormItem label="wg端口">{{ newServer.wgInfo?.listenPort }}</ElFormItem>
+      <ElFormItem label="vlan网段">{{ `${newServer.wgInfo?.vlanIp[0]}.${newServer.wgInfo?.vlanIp[1]}.0.0/16` }}</ElFormItem>
       <el-form-item>
         <el-row :gutter="24">
           <el-col :span="12" v-if="isNew">

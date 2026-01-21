@@ -35,11 +35,11 @@ export async function roomList(serverName: string, page: number = 1, size: numbe
 
 
 export async function wgInfo(serverName: string): Promise<{code: number, data: {publicKey: string, listenPort: number,
-    vlanIp: string
+    vlanIp: [number, number]
 }}> {
     const resp = await fetch(serverName, 'get', 'sapi/info/wginfo', true);
     if (resp.code !== 0) {
-        return {code: resp.code, data: {publicKey: "", listenPort: 0, vlanIp: ""}};
+        return {code: resp.code, data: {publicKey: "", listenPort: 0, vlanIp: [0, 0]}};
     }
-    return {code: 0, data: resp.data};
+    return {code: 0, data: resp.data}; 
 }
