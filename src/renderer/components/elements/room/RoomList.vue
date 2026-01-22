@@ -90,7 +90,17 @@ function inputPassword(roomId: string): void {
         return
       };
       const mates: { id: number, name: string, uuid: string, owner: boolean, addr: string, vlan: number, publicKey: string }[] = resp.data;
-      const  room = await roomer.createRoom(Connection.getInstance(props.serverName), roomId, props.serverName);
+      let self_vlan = 0;
+      for (const m of mates) {
+          if (m.uuid === svr.value.token?.userUuid) self_vlan = m.vlan;
+      };
+      if (self_vlan === 0) {
+        ElMessage({
+          type: "error", message: "获取虚拟网络IP失败"
+        })
+        return
+      }
+      const  room = await roomer.createRoom(Connection.getInstance(props.serverName), roomId, props.serverName, self_vlan);
       if (!room) {
         ElMessage({
           showClose: true, message: "初始化房间失败", type: "error"

@@ -20,6 +20,10 @@ function generateCurve25519Key() {
     return { publicKey: nacl.scalarMult.base(pri), privateKey: pri }
 }
 
+/**
+ * 访问dll，通过dll实现对wireguard的管理
+ * 无需考虑并发问题，koffi实现一定是串行
+ */
 class Wg {
     private lib: wgApi;
     public public_key: Uint8Array;
@@ -38,8 +42,8 @@ class Wg {
     }
 
     // 创建vlan局域网适配器
-    public async create_room(name: string, ip: string): Promise<boolean> {
-        const resp = this.lib.create_adapter(name, Buffer.from(this.public_key), Buffer.from(this.private_key), ip, Configs.wgPort);
+    public async create_room(name: string, ip: string, ip_area: string): Promise<boolean> {
+        const resp = this.lib.create_adapter(name, Buffer.from(this.public_key), Buffer.from(this.private_key), ip, ip_area, Configs.wgPort);
         if (resp.code != 0) {
             Logger.info(`创建wireguard房间失败: ${resp.code}, ${resp.msg}`);
             return false;
@@ -69,7 +73,7 @@ class Wg {
             Logger.info(resp.msg);
             return false;
         };
-        Logger.debug(`房间${room}添加成员：${name}，vlan：${vlan_ip}，endpoint: ${target}:${port}`)
+        Logger.debug(`房间${room}添加成员：${name}，vlan：${vlan_ip}，endpoint: ${target}:${port}`);
         return true;
     }
 
@@ -99,8 +103,10 @@ class Wg {
     }
 
     public async get_adapter_config(name: string): Promise<string> {
-        const resp = this.lib.get_adapter_config(name);
-        return resp.msg;
+        const buffer = Buffer.alloc(1024);
+        const resp = this.lib.get_adapter_config(name, buffer, 1024);
+        if (resp.code === 0) return buffer.toString();
+        return "";
     }
 
     // 释放dll

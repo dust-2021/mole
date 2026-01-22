@@ -100,8 +100,8 @@ ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
 })
 
 export const wireguardFunc = {
-    // 创建wireguard房间
-    createRoom: async (roomName: string, ip: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName, ip); },
+    // 创建wireguard房间，ip是本机vlan地址，ip_area是vlan网段
+    createRoom: async (roomName: string, ip: string, ip_area: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName, ip, ip_area); },
     // 删除wireguard房间
     delRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delRoom", roomName); },
     // 启动wireguard适配器

@@ -35,7 +35,7 @@ export interface wgApi {
     // 设置dll日志回调函数
     set_logger: (cb: koffi.IKoffiRegisteredCallback) => void,
     // 
-    create_adapter: (name: string, public_key: Buffer, private_key: Buffer, adaper_ip: string, listen_port: number) => Response,
+    create_adapter: (name: string, public_key: Buffer, private_key: Buffer, adaper_ip: string, ip_area: string, listen_port: number) => Response,
     del_adapter: (name: string) => Response,
     add_peer: (adapter_name: string, peer_name: string, ip: string, port: number, public_key: Buffer,
         transport_ip: string[], count: number
@@ -45,6 +45,6 @@ export interface wgApi {
     run_adapter: (name: string) => Response,
     // 停止适配器
     pause_adapter: (name: string) => Response,
-    get_adapter_config: (name: string) => Response,
+    get_adapter_config: (name: string, buffer: Buffer, size: number) => Response,
     unload: () => void,
 }

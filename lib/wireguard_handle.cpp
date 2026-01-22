@@ -163,7 +163,7 @@ public:
 
     // 创建适配器对象，已存在则直接返回
     _NODISCARD bool create_room(const wchar_t *name, const u_char *public_key,
-                                const u_char *private_key, const char *adapter_ip, uint16_t listen_port)
+                                const u_char *private_key, const char *adapter_ip, const char * ip_area, uint16_t listen_port)
     {
         if (rooms.find(name) != rooms.end())
         {
@@ -176,7 +176,7 @@ public:
         }
         // 创建配置并设置适配器
         auto conf = std::make_unique<room_config>(handle, name, public_key, private_key, listen_port);
-        if (!conf->set_config() || !bind_adapter(handle, adapter_ip))
+        if (!conf->set_config() || !bind_adapter(handle, adapter_ip, ip_area))
         {
             WireGuardCloseAdapter(handle);
             log(WIREGUARD_LOG_ERR, "adapter create failed");
@@ -315,12 +315,13 @@ extern "C"
      * 创建vlan房间
      * @param name: 房间名 @param public_key: 32位uint8类型的curve25519公钥 @param private_key: 32位uint8类型的curve25519私钥 @param port: 本机转发端口
      */
-    EXPORT response create_adapter(const wchar_t *name, const u_char *public_key, const u_char *private_key, const char *adapter_ip, uint16_t port)
+    EXPORT response create_adapter(const wchar_t *name, const u_char *public_key, const u_char *private_key, const char *adapter_ip,
+        const char * ip_area, uint16_t port)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
             return {1, L"wireguard.dll unload"};
-        if (!handle.create_room(name, public_key, private_key, adapter_ip, port))
+        if (!handle.create_room(name, public_key, private_key, adapter_ip, ip_area, port))
             return {1, L"create adapter failed"};
         return {0, L"success"};
     }
@@ -382,11 +383,14 @@ extern "C"
         return {0, L"success"};
     }
 
-    EXPORT response get_adapter_config(const wchar_t * name) {
+    EXPORT response get_adapter_config(const wchar_t * name, char * buffer, int l) {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
             return {1, L"wireguard.dll unload"};
-        handle.pause_adapter(name);
+        if (handle.rooms.find(name) == handle.rooms.end()) return {1, L"adapter not exist"};
+        auto conf = get_wg_conf(handle.rooms[name]->handle);
+        if (conf.length() > l) return {1, L"buffer too small"};
+        strcpy(buffer, conf.c_str());
         return {0, L"success"};
     }
 }
@@ -426,7 +430,7 @@ int main()
         224, 252, 205, 239, 30, 253, 28,
         144, 51, 178, 104, 128, 25, 169,
         103, 252, 146, 65};
-    if (!handle.create_room(L"test", pub_key, pri_key, "10.0.0.0", 8080))
+    if (!handle.create_room(L"test", pub_key, pri_key, "10.20.0.2", "10.20.0.0", 8080))
     {
         std::cout << "adapter create failed" << std::endl;
         return 0;

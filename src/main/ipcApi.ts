@@ -43,7 +43,7 @@ export function initialIPC(ipc: typeof ipcMain) {
     })
 
     // 虚拟局域网相关接口
-    ipc.handle("wireguard-createRoom", (Event, roomName: string, ip) => { return WgHandler.create_room(roomName, ip); })
+    ipc.handle("wireguard-createRoom", (Event, roomName: string, ip: string, ip_area: string) => { return WgHandler.create_room(roomName, ip, ip_area); })
     ipc.handle("wireguard-delRoom", (Event, roomName: string) => { return WgHandler.del_room(roomName); })
     ipc.handle("wireguard-runAdapter", (Event, roomName: string) => { return WgHandler.run_adapter(roomName); })
     ipc.handle("wireguard-pauseAdapter", (Event, roomName: string) => { return WgHandler.pause_adapter(roomName); })

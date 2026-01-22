@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {ref, Ref, toRaw, watch} from "vue";
 import {wsResp} from "../../../utils/publicType";
-import {roomCreate} from "../../../utils/api/ws/room";
+import {roomCreate, roomOut} from "../../../utils/api/ws/room";
 import DangerButton from "../../elements/DangerButton.vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
@@ -47,7 +47,14 @@ async function submit() {
       return
     };
     const data: {roomId: string, mates: {name: string, uuid: string, id: number, addr: string, owner: boolean, vlan: number, publicKey: string}[]} = r.data;
-    const room = await roomer.createRoom(Connection.getInstance(props.serverName), data.roomId, props.serverName);
+    if (data.mates.length !== 1) {
+      ElMessage({
+        type: "error", message: "获取虚拟网络IP失败"
+      })
+      roomOut(props.serverName, data.roomId);
+      return;
+    }
+    const room = await roomer.createRoom(Connection.getInstance(props.serverName), data.roomId, props.serverName, data.mates[0].vlan);
     if (room === null) {
       ElMessage({
         type: "error",
