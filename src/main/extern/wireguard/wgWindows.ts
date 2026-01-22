@@ -63,6 +63,7 @@ export const WireGuardAPI: CType.wgApi = {
     add_peer: wg.func("add_peer", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR, CType.c_type.LPCSTR, koffi.types.uint16,
         koffi.pointer(koffi.types.uchar), koffi.pointer(CType.c_type.LPCSTR), koffi.types.int
     ]),
+    update_peer_endpoint: wg.func("update_peer_endpoint", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR, CType.c_type.LPCSTR,koffi.types.uint16]),
     del_peer: wg.func("del_peer", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR]),
     run_adapter: wg.func("run_adapter", CType.c_type.response, [CType.c_type.LPCWSTR]),
     pause_adapter: wg.func("pause_adapter", CType.c_type.response, [CType.c_type.LPCWSTR]),

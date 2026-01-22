@@ -163,7 +163,7 @@ public:
 
     // 创建适配器对象，已存在则直接返回
     _NODISCARD bool create_room(const wchar_t *name, const u_char *public_key,
-                                const u_char *private_key, const char *adapter_ip, const char * ip_area, uint16_t listen_port)
+                                const u_char *private_key, const char *adapter_ip, const char *ip_area, uint16_t listen_port)
     {
         if (rooms.find(name) != rooms.end())
         {
@@ -210,12 +210,13 @@ public:
             return false;
         };
         auto &room = rooms[adapter_name];
+        WIREGUARD_PEER new_peer = {};
         if (room->peers.find(peer_name) != room->peers.end())
         {
-            log(WIREGUARD_LOG_ERR, "add peer already exists");
+            log(WIREGUARD_LOG_ERR, "add peer existed");
             return false;
         }
-        WIREGUARD_PEER new_peer = {};
+        new_peer.Flags = room_config::BASE_PEER_FLAG;
         new_peer.PersistentKeepalive = 15;
         if (!parse_ip(ip, port, new_peer.Endpoint))
         {
@@ -223,7 +224,6 @@ public:
             return false;
         }
         memcpy(new_peer.PublicKey, pub_key, WIREGUARD_KEY_LENGTH);
-        new_peer.Flags = room_config::BASE_PEER_FLAG;
         new_peer.AllowedIPsCount = allowed_ip_count;
         room->peers[peer_name] = new_peer;
         // 初始化转发IP列表
@@ -251,12 +251,42 @@ public:
         return true;
     }
 
-    // 删除适配器中的成员
-    void del_peer(const wchar_t *room_name, const wchar_t *peer_name)
+    bool update_peer_endpoint(const wchar_t *adapter_name, const wchar_t *peer_name, const char *ip, uint16_t port)
     {
-        if (rooms.find(room_name) == rooms.end())
+        if (rooms.find(adapter_name) == rooms.end())
+        {
+            log(WIREGUARD_LOG_ERR, "update peer failed for not exist room");
+            return false;
+        };
+        auto &room = rooms[adapter_name];
+        if (room->peers.find(peer_name) == room->peers.end())
+        {
+            log(WIREGUARD_LOG_ERR, "update peer not existed");
+            return false;
+        }
+        auto old = room->peers[peer_name].Endpoint;
+        if (!parse_ip(ip, port, room->peers[peer_name].Endpoint))
+        {
+            log(WIREGUARD_LOG_ERR, "parse new endpoint failed");
+            return false;
+        }
+        room->peers[peer_name].Flags |= WIREGUARD_PEER_UPDATE_ONLY;
+        if (!room->set_config())
+        {
+            room->peers[peer_name].Endpoint = old;
+            room->peers[peer_name].Flags = room_config::BASE_PEER_FLAG;
+            return false;
+        };
+        room->peers[peer_name].Flags = room_config::BASE_PEER_FLAG;
+        return true;
+    }
+
+    // 删除适配器中的成员
+    void del_peer(const wchar_t *adapter_name, const wchar_t *peer_name)
+    {
+        if (rooms.find(adapter_name) == rooms.end())
             return;
-        auto &room = rooms[room_name];
+        auto &room = rooms[adapter_name];
         if (room->peers.find(peer_name) == room->peers.end())
             return;
         // 设置删除
@@ -316,7 +346,7 @@ extern "C"
      * @param name: 房间名 @param public_key: 32位uint8类型的curve25519公钥 @param private_key: 32位uint8类型的curve25519私钥 @param port: 本机转发端口
      */
     EXPORT response create_adapter(const wchar_t *name, const u_char *public_key, const u_char *private_key, const char *adapter_ip,
-        const char * ip_area, uint16_t port)
+                                   const char *ip_area, uint16_t port)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
@@ -355,6 +385,17 @@ extern "C"
         return {0, L"success"};
     }
 
+    EXPORT response update_peer_endpoint(const wchar_t *room_name, const wchar_t *peer_name, const char *ip, uint16_t port)
+    {
+        auto &handle = WireGuardHandle::getInstance();
+        if (wg == nullptr)
+            return {1, L"wireguard.dll unload"};
+        if (!handle.update_peer_endpoint(room_name, peer_name, ip, port)) {
+            return {1, L"update failed"};
+        };
+        return {0, L"success"};
+    }
+
     EXPORT response del_peer(const wchar_t *room_name, const wchar_t *peer_name)
     {
         auto &handle = WireGuardHandle::getInstance();
@@ -383,13 +424,16 @@ extern "C"
         return {0, L"success"};
     }
 
-    EXPORT response get_adapter_config(const wchar_t * name, char * buffer, int l) {
+    EXPORT response get_adapter_config(const wchar_t *name, char *buffer, int l)
+    {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
             return {1, L"wireguard.dll unload"};
-        if (handle.rooms.find(name) == handle.rooms.end()) return {1, L"adapter not exist"};
+        if (handle.rooms.find(name) == handle.rooms.end())
+            return {1, L"adapter not exist"};
         auto conf = get_wg_conf(handle.rooms[name]->handle);
-        if (conf.length() > l) return {1, L"buffer too small"};
+        if (conf.length() > l)
+            return {1, L"buffer too small"};
         strcpy(buffer, conf.c_str());
         return {0, L"success"};
     }

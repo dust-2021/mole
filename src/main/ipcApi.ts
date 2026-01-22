@@ -50,6 +50,8 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("wireguard-addPeer", (Event, roomName: string, peerName: string, host: string,
         port: number, pub_key: string, vlan_ip: [string], vlan_ip_count: number
     ) => { return WgHandler.add_peer(roomName, peerName, host, port, pub_key, vlan_ip, vlan_ip_count); })
+    ipc.handle("wireguard-updatePeerEndpoint", (Event, roomName: string, peerName: string, ip: string, port: number) => { 
+        return WgHandler.update_peer_endpoint(roomName, peerName, ip, port); })
     ipc.handle("wireguard-delPeer", (Event, roomName: string, peerName: string) => { return WgHandler.del_peer(roomName, peerName); })
     ipc.handle("wireguard-publicKey", (Event) => { return Buffer.from(WgHandler.public_key).toString('base64'); })
 

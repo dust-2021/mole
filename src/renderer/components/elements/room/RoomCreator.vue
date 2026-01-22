@@ -46,7 +46,7 @@ async function submit() {
       })
       return
     };
-    const data: {roomId: string, mates: {name: string, uuid: string, id: number, addr: string, owner: boolean, vlan: number, publicKey: string}[]} = r.data;
+    const data: {roomId: string, mates: {name: string, uuid: string, id: number, owner: boolean, vlan: number, publicKey: string}[]} = r.data;
     if (data.mates.length !== 1) {
       ElMessage({
         type: "error", message: "获取虚拟网络IP失败"
@@ -62,7 +62,7 @@ async function submit() {
       })
       return
     }
-    await room.addMember(data.mates.map((item) => {return {userId: item.id, username: item.name, userUuid: item.uuid, vlan: item.vlan, publicKey: item.publicKey, owner: item.owner, addr: item.addr}}))
+    await room.addMember(data.mates.map((item) => {return {userId: item.id, username: item.name, userUuid: item.uuid, vlan: item.vlan, publicKey: item.publicKey, owner: item.owner}}))
     router.push(`/server/room/page/${props.serverName}/${data.roomId}`);
   })
 }

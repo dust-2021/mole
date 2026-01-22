@@ -77,6 +77,17 @@ class Wg {
         return true;
     }
 
+    public async update_peer_endpoint(room: string, peer: string, ip: string, port: number): Promise<boolean> {
+        if (!net.isIP(ip)) return false;
+        const resp = this.lib.update_peer_endpoint(room, peer, ip, port);
+        if (resp.code != 0) {
+            Logger.info(resp.msg);
+            return false;
+        };
+        Logger.debug(`房间${room}更新成员地址：${peer} : ${ip}:${port}`);
+        return true;
+    }
+
     public async del_peer(room: string, name: string): Promise<boolean> {
         return this.lib.del_peer(room, name).code == 0;
     }
