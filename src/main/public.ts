@@ -1,14 +1,12 @@
-import path = require('path');
-import fs = require('fs');
+import path from 'path';
+import fs from 'fs';
+import winston from 'winston';
 import {app, ipcRenderer} from "electron";
 
 const storePath = app.getPath('userData');
 
 // src目录，编译后的dist目录
 export const BaseDir = path.dirname(__dirname);
-
-const env = process.env.MOLE_ENV;
-export let environment: string = env ? env : "pro";
 
 // 向窗口发送消息
 export function sendToFront(type_ : 'info' | 'warning' | 'success' | 'error', msg: string): void {
@@ -59,14 +57,12 @@ class AppConfig {
 // app设置
 export const Configs = new AppConfig();
 
-import winston = require('winston');
-
 // 配置日志记录器
 const logFile = path.join(storePath, 'logs', 'mole.log');
 
-const logOutpot = [];
+const logOutpot: any[] = [];
 
-if(environment === "dev") {
+if(!app.isPackaged) {
     logOutpot.push(new winston.transports.Console({format: winston.format.simple()}));
     Configs.update("loglevel", "debug");
 } else {
@@ -85,5 +81,5 @@ export const Logger = winston.createLogger({
 });
 
 
-Logger.info(`app run on env: ${environment}, log level: ${Configs.loglevel}`);
+Logger.info(`app run on log level: ${Configs.loglevel}`);
 

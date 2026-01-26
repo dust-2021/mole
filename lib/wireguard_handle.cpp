@@ -2,6 +2,7 @@
 #include <string>
 #include "src/wireguard.h"
 #include "wireguard_tool.cpp"
+#include "broadcaster.cpp"
 #include <memory>
 #include "mutex"
 #include "chrono"
@@ -90,8 +91,7 @@ public:
         // 设置配置
         if (WireGuardSetConfiguration(handle, static_cast<WIREGUARD_INTERFACE *>(conf), size_of_config) != 0)
             return true;
-        auto r = GetLastError();
-        log(WIREGUARD_LOG_ERR, ("set configuration failed code:" + std::to_string(r)).c_str());
+        log(WIREGUARD_LOG_ERR, "set configuration failed", GetLastError());
         return false;
     }
 
@@ -125,12 +125,14 @@ private:
         WSADATA wsaData;
         if (const int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData); iResult != 0)
         {
-            log(WIREGUARD_LOG_ERR, "load ws2 failed");
+            log(WIREGUARD_LOG_ERR, "load ws2 failed", GetLastError());
         }
         // 加载dll
         initial();
         WireGuardSetLogger((WIREGUARD_LOGGER_CALLBACK)&log_dll);
-
+        // 初始化广播转发器
+        auto & trans = broadcast_trans::getInstance();
+        trans.run();
         log(WIREGUARD_LOG_INFO, "handler created");
     }
 
@@ -140,25 +142,32 @@ private:
     };
 
 public:
-    static WireGuardHandle instance;
+    static WireGuardHandle h_instance;
     static std::once_flag initInstanceFlag;
     std::unordered_map<std::wstring, std::unique_ptr<room_config>> rooms;
     WireGuardHandle(const WireGuardHandle &) = delete;
 
     WireGuardHandle &operator=(const WireGuardHandle &) = delete;
 
-    ~WireGuardHandle()
-    {
+    void clear() {
+        for (auto &room : rooms)
+        {
+            WireGuardCloseAdapter(room.second->handle);
+        }
+        rooms.clear();
         // 释放winsock
         WSACleanup();
+        FreeLibrary(wg);
+        auto & trans = broadcast_trans::getInstance();
+        trans.stop_trans();
         log(WIREGUARD_LOG_INFO, "handler closed");
-    };
+    }
 
     static WireGuardHandle &getInstance()
     {
         std::call_once(WireGuardHandle::initInstanceFlag, []()
                        { init(); });
-        return instance;
+        return h_instance;
     };
 
     // 创建适配器对象，已存在则直接返回
@@ -179,7 +188,7 @@ public:
         if (!conf->set_config() || !bind_adapter(handle, adapter_ip, ip_area))
         {
             WireGuardCloseAdapter(handle);
-            log(WIREGUARD_LOG_ERR, "adapter create failed");
+            log(WIREGUARD_LOG_ERR, "adapter create failed", GetLastError());
             return false;
         }
         // 去除清空peer的状态码
@@ -218,6 +227,7 @@ public:
         }
         new_peer.Flags = room_config::BASE_PEER_FLAG;
         new_peer.PersistentKeepalive = 15;
+        // 设置对端真实地址
         if (!parse_ip(ip, port, new_peer.Endpoint))
         {
             log(WIREGUARD_LOG_ERR, "peer endpoint format error");
@@ -234,20 +244,21 @@ public:
             WIREGUARD_ALLOWED_IP allowed_ip = {};
             if (!parse_allowed_ip(std::string(allowed_ips[i]), allowed_ip))
             {
-                log(WIREGUARD_LOG_ERR, strcat("allowed_ip format failed: ", allowed_ips[i]));
-                goto onfailed;
+                log(WIREGUARD_LOG_WARN, strcat("allowed_ip format failed: ", allowed_ips[i]));
+                continue;
             }
             room->peer_allowed_ips[peer_name].push_back(allowed_ip);
         }
         // 配置失败回退
         if (!room->set_config())
         {
-        onfailed:
             room->peers.erase(peer_name);
             room->peer_allowed_ips.erase(peer_name);
             room->interface_config.PeersCount = room->peers.size();
             return false;
-        }
+        };
+        auto& trans = broadcast_trans::getInstance();
+        trans.add_peer(room->peer_allowed_ips[peer_name].data(), room->peer_allowed_ips[peer_name].size());
         return true;
     }
 
@@ -320,7 +331,7 @@ public:
 };
 
 std::once_flag WireGuardHandle::initInstanceFlag;
-WireGuardHandle WireGuardHandle::instance;
+WireGuardHandle WireGuardHandle::h_instance;
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // |-------------------------- 导出函数定义 --------------------------- |
@@ -328,15 +339,11 @@ WireGuardHandle WireGuardHandle::instance;
 
 extern "C"
 {
-    EXPORT void set_env(char *val)
-    {
-        env = val;
-    }
     /**
      * 设置全局日志回调
      * @param cb: 回调函数指针
      */
-    EXPORT void set_logger(void (*cb)(WIREGUARD_LOGGER_LEVEL level, const char *msg))
+    EXPORT void set_logger(void (*cb)(WIREGUARD_LOGGER_LEVEL level, const char *msg, int code))
     {
         log_func = cb;
     }
@@ -437,10 +444,15 @@ extern "C"
         strcpy(buffer, conf.c_str());
         return {0, L"success"};
     }
+
+    EXPORT void clear_all() {
+        auto &handle = WireGuardHandle::getInstance();
+        handle.clear();
+    }
 }
 namespace test
 {
-    void __stdcall test_log(const WIREGUARD_LOGGER_LEVEL level, const char *msg)
+    void __stdcall test_log(const WIREGUARD_LOGGER_LEVEL level, const char *msg, int code)
     {
         // 毫秒时间戳
         unsigned long long timestamp;
@@ -459,7 +471,6 @@ namespace test
 
 int main()
 {
-    env = "debug-dll";
     test::set_logger();
     auto &handle = WireGuardHandle::getInstance();
     // ed25519公私钥

@@ -1,5 +1,5 @@
 import { Logger } from '../../public';
-import koffi = require('koffi');
+import koffi from 'koffi';
 
 // c的简单类型定义
 export const c_type = {
@@ -14,31 +14,18 @@ export const c_type = {
 // ffi调用统一返回结构体类型
 type Response = { code: number, msg: string };
 
-function logger_callback(level: number, msg: string) {
-    let level_s = "info";
-    switch (level) {
-        case 1:
-            level_s = "warning";
-        case 2:
-            level_s = "error";
-    }
-    Logger.log(level_s, '[wireguard] | ' + msg);
-}
-
 // wireguard日志回调函数类型定义，0-info，1-warning，2-error
 export const WireGuardLoggerCallback = koffi.proto('WireGuardLoggerCallback', koffi.types.void,
-    [koffi.types.uint, c_type.LPCSTR]);
-export const WireGuardLoggerCallback_R = koffi.register(logger_callback, koffi.pointer(WireGuardLoggerCallback));
+    [koffi.types.uint, c_type.LPCSTR, koffi.types.int]);
 
 export interface wgApi {
-    set_env: (env: string) => void,
     // 设置dll日志回调函数
     set_logger: (cb: koffi.IKoffiRegisteredCallback) => void,
     // 
     create_adapter: (name: string, public_key: Buffer, private_key: Buffer, adaper_ip: string, ip_area: string, listen_port: number) => Response,
     del_adapter: (name: string) => Response,
     add_peer: (adapter_name: string, peer_name: string, ip: string, port: number, public_key: Buffer,
-        transport_ip: string[], count: number
+        transport_ip: string[], count: number, as_transporter: boolean
     ) => Response,
     update_peer_endpoint: (adapter_name: string, peer_name: string, ip: string, port: number) => Response,
     del_peer: (adapter_name: string, peer_name: string) => Response,
@@ -47,5 +34,6 @@ export interface wgApi {
     // 停止适配器
     pause_adapter: (name: string) => Response,
     get_adapter_config: (name: string, buffer: Buffer, size: number) => Response,
+    clear_all: () => void,
     unload: () => void,
 }

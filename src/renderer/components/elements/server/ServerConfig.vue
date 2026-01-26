@@ -199,11 +199,11 @@ onBeforeMount(() => {
           </template>
         </el-dialog>
       </el-form-item>
-      <el-form-item label="公钥">
+      <!-- <el-form-item label="公钥">
         <ElText>{{ newServer.wgInfo?.publicKey }}</ElText>
       </el-form-item>
       <ElFormItem label="wg端口">{{ newServer.wgInfo?.listenPort }}</ElFormItem>
-      <ElFormItem label="vlan网段">{{ `${newServer.wgInfo?.vlanIp[0]}.${newServer.wgInfo?.vlanIp[1]}.0.0/16` }}</ElFormItem>
+      <ElFormItem label="vlan网段">{{ `${newServer.wgInfo?.vlanIp[0]}.${newServer.wgInfo?.vlanIp[1]}.0.0/16` }}</ElFormItem> -->
       <el-form-item>
         <el-row :gutter="24">
           <el-col :span="12" v-if="isNew">

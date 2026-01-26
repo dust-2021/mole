@@ -1,8 +1,9 @@
 import { platform } from "process";
-import { Configs, Logger, environment } from "../../public";
-import { wgApi, WireGuardLoggerCallback_R } from "./ctype"
+import {app} from 'electron';
+import { Configs, Logger } from "../../public";
+import { wgApi } from "./ctype"
 import path = require("path");
-import { WireGuardAPI as winApi } from "./wgWindows";
+import { WireGuardAPI as winApi, win_logger } from "./wgWindows";
 import nacl from 'tweetnacl';
 import dns from 'dns/promises';
 import * as net from 'net';
@@ -31,14 +32,13 @@ class Wg {
     constructor() {
         if (platform == 'win32') {
             this.lib = winApi;
+            this.lib.set_logger(win_logger);
         } else {
             throw Error("platform error: not support for " + platform);
         }
         const data = generateCurve25519Key();
         this.private_key = Uint8Array.from(data.privateKey);
         this.public_key = Uint8Array.from(data.publicKey);
-        this.lib.set_env(environment);
-        this.lib.set_logger(WireGuardLoggerCallback_R);
     }
 
     // 创建vlan局域网适配器
@@ -59,7 +59,8 @@ class Wg {
         return f;
     }
 
-    public async add_peer(room: string, name: string, host: string, port: number, pub_key: string, vlan_ip: string[], vlan_ip_count: number): Promise<boolean> {
+    public async add_peer(room: string, name: string, host: string, port: number, pub_key: string, vlan_ip: string[], 
+        vlan_ip_count: number, as_transporter: boolean): Promise<boolean> {
         let target: string;
         if (net.isIP(host)) {
             target = host;
@@ -68,7 +69,7 @@ class Wg {
             if (ips.length == 0) return false;
             target = ips[0];
         }
-        const resp = this.lib.add_peer(room, name, target, port, Buffer.from(pub_key, "base64"), vlan_ip, vlan_ip_count);
+        const resp = this.lib.add_peer(room, name, target, port, Buffer.from(pub_key, "base64"), vlan_ip, vlan_ip_count, as_transporter);
         if (resp.code != 0) {
             Logger.info(resp.msg);
             return false;
@@ -122,6 +123,7 @@ class Wg {
 
     // 释放dll
     public dispose() {
+        this.lib.clear_all();
         this.lib.unload();
     }
 }

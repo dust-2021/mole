@@ -113,7 +113,7 @@ export class Room {
                 if (item.userUuid === this.selfUuid) continue;
                 // ip设为服务器地址，在获取到peer真实地址前使用服务器转发
                 await wireguardFunc.addPeer(this.roomId, item.userUuid, item.ip ? item.ip : this.host, item.port ? item.port : this.port, item.publicKey,
-                    [this.vlanPrefix + `${item.vlan >> 8}.${item.vlan & 0xff}/32`], 1)
+                    [this.vlanPrefix + `${item.vlan >> 8}.${item.vlan & 0xff}/32`, '192.168.0.1/24'], 1)
             }
             this.addMsg(m.map((item) => { return { fromUuid: "", text: `${item.username}加入房间`, timestamp: Date.now(), fromUsername: "" } }))
         } catch (error) { } finally {
@@ -156,6 +156,19 @@ export class Room {
         } catch (error) { } finally { r() };
     }
 
+    // 更新成员真实地址信息
+    public async updateEndpoint(peer_uuid: string, ip: string, port: number) {
+        const r = await this.lock.acquireWrite();
+        try {
+            let peer = this.members.value.get(peer_uuid);
+            if (!peer) return;
+            peer.ip = ip;
+            peer.port = port;
+            this.members.value.set(peer_uuid, peer);
+            await wireguardFunc.updatePeerEndpoint(this.roomId, peer_uuid, ip, port);
+            // TODO: 添加新地址校验逻辑
+        } catch (error) { } finally { r() }
+    }
 }
 
 export const roomer = new RoomController();
@@ -196,11 +209,7 @@ async function handle(t: string, r: wsResp) {
             break;
         case "updatePeerEndpoint":
             const data_update: { uuid: string, ip: string, port: number } = r.data;
-            let mem = room.members.value.get(data_update.uuid);
-            if (!mem) return;
-            mem.ip = data_update.ip;
-            mem.port = data_update.port;
-            room.addMember([mem]);
+            await room.updateEndpoint(data_update.uuid, data_update.ip, data_update.port);
     }
 }
 

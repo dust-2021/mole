@@ -18,7 +18,7 @@ static constexpr size_t allowed_ip_size = sizeof(WIREGUARD_ALLOWED_IP);
 static const uint8_t MASK = 16;
 
 // 外部日志函数钩子
-static void (*log_func)(WIREGUARD_LOGGER_LEVEL level, const char *msg) = nullptr;
+static void (*log_func)(WIREGUARD_LOGGER_LEVEL level, const char *msg, int code) = nullptr;
 
 // 用于wireguard日志回调转换
 void log_dll(const WIREGUARD_LOGGER_LEVEL level, int64_t dt, const wchar_t *msg)
@@ -30,18 +30,16 @@ void log_dll(const WIREGUARD_LOGGER_LEVEL level, int64_t dt, const wchar_t *msg)
     int size_needed = WideCharToMultiByte(CP_UTF8, 0, msg, -1, NULL, 0, NULL, NULL);
     std::string str(size_needed, 0);
     WideCharToMultiByte(CP_UTF8, 0, msg, -1, &str[0], size_needed, NULL, NULL);
-    log_func(level, str.c_str());
+    log_func(level, str.c_str(), level == WIREGUARD_LOG_ERR? GetLastError(): 0);
 }
 
-static std::string env = "";
-
-void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg)
+void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg, int code = 0)
 {
     if (log_func == nullptr)
     {
         return;
     }
-    log_func(level, msg);
+    log_func(level, msg, code);
 }
 
 struct response
@@ -65,27 +63,40 @@ static WIREGUARD_SET_CONFIGURATION_FUNC *WireGuardSetConfiguration;
 
 static HMODULE wg = nullptr;
 
+void LoadWireguardDll() {
+    // 获取自身路径
+    HMODULE hModule = NULL;
+    GetModuleHandleExW(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | 
+        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        (LPCWSTR)&LoadWireguardDll,
+        &hModule
+    );
+    
+    wchar_t selfPath[MAX_PATH];
+    GetModuleFileNameW(hModule, selfPath, MAX_PATH);
+    
+    // 提取目录
+    std::wstring dir(selfPath);
+    size_t pos = dir.find_last_of(L"\\/");
+    if (pos != std::string::npos) {
+        dir = dir.substr(0, pos);
+    }
+    
+    // 加载同目录的 wireguard.dll
+    std::wstring wireguardPath = dir + L"\\wireguard.dll";
+    wg = LoadLibraryW(wireguardPath.c_str());
+}
+
 // 加载wireguard动态库
 void initial()
-{
-    auto curdir = fs::current_path();
-    auto dll_dir = L"resource/wireguard/wireguard.dll"; // electron打包完成后
-    if (env == "dev")                                   // electron调试
-    {
-        dll_dir = L"lib/src/wireguard.dll";
-    }
-    else if (env == "debug-dll") // dll调试
-    {
-        dll_dir = L"src/wireguard.dll";
-    }
-    auto fullpath = curdir / dll_dir;
-    wg =
-        LoadLibraryExW(fullpath.c_str(), nullptr,
-
-                       LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+{   
+    LoadWireguardDll();
+        // LoadLibraryExW(fullpath.c_str(), nullptr,
+        //                LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (wg == nullptr)
     {
-        log(WIREGUARD_LOG_INFO, "load wireguard failed");
+        log(WIREGUARD_LOG_INFO, "load wireguard or windivert failed");
         return;
     }
 #define X(Name) ((*(FARPROC *)&Name = GetProcAddress(wg, #Name)) == NULL)
@@ -142,12 +153,12 @@ bool parse_allowed_ip(std::string &ip_string, WIREGUARD_ALLOWED_IP &rec)
         if (cidr_part.empty())
             rec.Cidr = 32;
     }
-    else if (inet_pton(AF_INET6, ip_string.c_str(), &rec.Address.V6) == 1)
-    {
-        rec.AddressFamily = AF_INET6;
-        if (cidr_part.empty())
-            rec.Cidr = 128;
-    }
+    // else if (inet_pton(AF_INET6, ip_string.c_str(), &rec.Address.V6) == 1)
+    // {
+    //     rec.AddressFamily = AF_INET6;
+    //     if (cidr_part.empty())
+    //         rec.Cidr = 128;
+    // }
     else
     {
         log(WIREGUARD_LOG_ERR, "ip format error");

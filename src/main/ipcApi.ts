@@ -48,8 +48,8 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("wireguard-runAdapter", (Event, roomName: string) => { return WgHandler.run_adapter(roomName); })
     ipc.handle("wireguard-pauseAdapter", (Event, roomName: string) => { return WgHandler.pause_adapter(roomName); })
     ipc.handle("wireguard-addPeer", (Event, roomName: string, peerName: string, host: string,
-        port: number, pub_key: string, vlan_ip: [string], vlan_ip_count: number
-    ) => { return WgHandler.add_peer(roomName, peerName, host, port, pub_key, vlan_ip, vlan_ip_count); })
+        port: number, pub_key: string, vlan_ip: [string], vlan_ip_count: number, as_transporter: boolean
+    ) => { return WgHandler.add_peer(roomName, peerName, host, port, pub_key, vlan_ip, vlan_ip_count, as_transporter); })
     ipc.handle("wireguard-updatePeerEndpoint", (Event, roomName: string, peerName: string, ip: string, port: number) => { 
         return WgHandler.update_peer_endpoint(roomName, peerName, ip, port); })
     ipc.handle("wireguard-delPeer", (Event, roomName: string, peerName: string) => { return WgHandler.del_peer(roomName, peerName); })

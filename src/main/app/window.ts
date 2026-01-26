@@ -1,5 +1,5 @@
 import {app, BrowserWindow, ipcMain} from "electron";
-import {BaseDir, environment} from "../public";
+import {BaseDir} from "../public";
 import path from "path";
 
 export function mainWindow() {
@@ -11,7 +11,7 @@ export function mainWindow() {
         frame: false,
         webPreferences: {
             preload: path.join(BaseDir, 'main/preload.js'),
-            webSecurity: environment !== 'dev',
+            webSecurity: app.isPackaged,
             nodeIntegration: false,
             contextIsolation: true
         }
@@ -32,7 +32,7 @@ export function mainWindow() {
     })
 
     // 加载 Vite 开发服务器或构建后的文件
-    if (environment === "dev") {
+    if (!app.isPackaged) {
         mainWindow.loadURL('http://localhost:3000');
         // mainWindow.webContents.openDevTools(); // 打开开发者工具
     } else {

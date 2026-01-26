@@ -7,17 +7,43 @@
     "build": "vite build && tsc && electron-builder"
   },
   "build": {
-    "extraFiles": [
+    "appId": "com.x.mole",
+    "productName": "mole",
+    "directories": {
+      "output": "locals/pack/${version}"
+    },
+    "files": [
+      "dist/main/**/*",
+      "dist/renderer/**/*",
+      "dist/shared/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "extraResources": [
       {
-        "from": "lib/wireguard/src/${file}",
-        "to": "resources/wireguard/${file}",
-        "filter": [
-          "wireguard.dll",
-          "wireguard_handle.dll",
-          "wireguard-amd64-0.5.3.msi"
-        ]
+        "from": "lib/src/wireguard.dll",
+        "to": "wireguard.dll"
+      },
+      {
+        "from": "lib/src/wireguard_handle.dll",
+        "to": "wireguard_handle.dll"
+      },
+      {
+        "from": "lib/src/WinDivert.dll",
+        "to": "WinDivert.dll"
+      },
+      {
+        "from": "lib/src/WinDivert64.sys",
+        "to": "WinDivert64.sys"
       }
-    ]
+    ],
+    "win": {
+      "icon": "dist/mole.ico"
+    }
   },
   "keywords": [],
   "author": "li",
@@ -31,6 +57,7 @@
     "@types/ws": "^8.18.1",
     "electron": "^34.2.0",
     "electron-builder": "^26.0.12",
+    "esbuild": "^0.27.2",
     "fast-glob": "^3.3.3",
     "typescript": "^5.7.3",
     "unplugin-auto-import": "^19.1.1",
@@ -46,6 +73,7 @@
     "buffer": "^6.0.3",
     "element-plus": "^2.9.7",
     "getmac": "^6.6.0",
+    "iconv-lite": "^0.7.2",
     "koffi": "^2.14.0",
     "pinia": "^3.0.2",
     "tweetnacl": "^1.0.3",
