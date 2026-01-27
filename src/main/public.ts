@@ -28,6 +28,8 @@ class AppConfig {
         } catch (e) {
             this.attribute.clear();
             Logger.error(`Failed to load app config: ${e}, using default config`);
+            return
+        } finally {
             if (!this.attribute.has('loglevel')) {
                 this.attribute.set('loglevel', 'info');
             }
@@ -37,7 +39,6 @@ class AppConfig {
             if (!this.attribute.has('udpPort')) {
                 this.attribute.set('udpPort', 8081);
             }
-            return
         }
     }
 
