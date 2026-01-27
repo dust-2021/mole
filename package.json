@@ -42,7 +42,7 @@
       }
     ],
     "win": {
-      "icon": "dist/mole.ico"
+      "icon": "src/assets/mole.ico"
     }
   },
   "keywords": [],

@@ -10,10 +10,13 @@ export function mainWindow() {
         // backgroundColor: '#00000000',
         frame: false,
         webPreferences: {
+            devTools: !app.isPackaged,
             preload: path.join(BaseDir, 'main/preload.js'),
             webSecurity: app.isPackaged,
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            sandbox: true,
+            spellcheck: false
         }
     });
 

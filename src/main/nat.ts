@@ -4,13 +4,8 @@ import { AsyncMap } from "../shared/asynchronous";
 import { ipcRenderer } from "electron";
 
 enum UdpMsgType {
-    // 向公网服务器获取本机公网地址
-    getPublicAddressMain = "getPublicAddressMain",
-    // 副端口确认nat类型，不同端口的公网地址是否相同
-    getPublicAddressSlave = "getPublicAddressSlave",
+    turn = "turn",
     connectPeer = "connectPeer",
-    // 接收公网地址
-    receivePublicAddress = "receivePublicAddress",
 
     peerReply = "peerReply",
 }
@@ -38,7 +33,9 @@ class UdpHandler {
         this.soc.on('message', this.listener);
         this.slaveSoc.on("message", (msg: Buffer, info: dgram.RemoteInfo) => {
             const message = msg.toString('utf-8').split('\r\n');
-            if (message.length !== 3 || message[0] !== UdpMsgType.receivePublicAddress.toString()) return;
+            // TODO: nat类型确认逻辑
+            if (message.length !== 3 || message[0] !== UdpMsgType.turn.toString()) return;
+
         });
         this.soc.bind(this.port);
         this.slaveSoc.bind(this.port + 1);
@@ -63,7 +60,7 @@ class UdpHandler {
                 // 收到确认，向渲染进程发送成功消息
                 ipcRenderer.send(`udp-connect-${context[1]}`, true);
                 break;
-            case UdpMsgType.receivePublicAddress.toString():
+            case UdpMsgType.turn.toString():
 
 
         }
