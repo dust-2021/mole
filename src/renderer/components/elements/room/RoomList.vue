@@ -7,7 +7,7 @@ import { Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue
 import {Services} from "../../../utils/stores";
 import {ElMessage, ElMessageBox} from "element-plus";
 import {useRouter} from 'vue-router';
-import { roomer } from "../../../utils/roomController";
+import { roomer, member} from "../../../utils/roomController";
 import { Connection } from "../../../utils/conn";
 
 const props = defineProps(
@@ -89,7 +89,7 @@ function inputPassword(roomId: string): void {
         } as any)
         return
       };
-      const mates: { id: number, name: string, uuid: string, owner: boolean, vlan: number, publicKey: string }[] = resp.data;
+      const mates: member[] = resp.data;
       let self_vlan = 0;
       for (const m of mates) {
           if (m.uuid === svr.value.token?.userUuid) self_vlan = m.vlan;
@@ -107,7 +107,7 @@ function inputPassword(roomId: string): void {
         })
         return;
       }
-      room.addMember(mates.map((m) => {return {userId: m.id, userUuid: m.uuid, username: m.name, vlan: m.vlan, owner: m.owner, publicKey: m.publicKey}}))
+      room.addMembers(mates);
       router.push(`/server/room/page/${props.serverName}/${roomId}`)
     })
   })

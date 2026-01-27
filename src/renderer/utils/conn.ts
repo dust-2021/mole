@@ -5,7 +5,7 @@ import { v4 as uuid } from "uuid";
 import { AsyncMap, RWLock } from '../../shared/asynchronous'
 
 // ws响应处理函数类型，传入当前服务器ws连接类和ws报文
-export type wsHandleFunc = (resp: wsResp) => void;
+export type wsHandleFunc = (resp: wsResp) => void | Promise<void>;
 
 /* ws连接管理，每个服务器名会生成一个连接单例
 所有连接共有一个publicHandleByMethod回调处理函数表，私有handleByMethod，handleById回调处理函数表，回调请求只会
@@ -115,7 +115,10 @@ export class Connection {
             if (await this.handleById.has(r.id)) {
                 f = await this.handleById.get(r.id);
             }
-            f?.(r);
+            const result = f?.(r);
+            if (result instanceof Promise) {
+                await result;
+            }
         } catch (e) {
             console.error(e);
         } finally {

@@ -30,9 +30,6 @@ public:
 
     void add_peer(uint32_t ip)
     {
-        // 虚拟局域网网段内前两个地址不进行转发
-        if (ip & 0xffff <= 1)
-            return;
         std::unique_lock<std::shared_mutex> lock(peer_rw_lock);
         peers.insert(ip);
     }
@@ -42,10 +39,6 @@ public:
         std::unique_lock<std::shared_mutex> lock(peer_rw_lock);
         for (size_t i = 0; i < count; i++)
         {
-            if (ip[i].Address.V4.S_un.S_addr & 0xffff <= 1)
-            {
-                continue;
-            }
             peers.insert(ip[i].Address.V4.S_un.S_addr);
         }
     }

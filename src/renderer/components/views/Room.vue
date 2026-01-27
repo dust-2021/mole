@@ -138,7 +138,7 @@ onBeforeUnmount(async () => {
               <el-col :span="14">
                 <el-row :gutter="24">
                   <el-col :span="16">
-                    <el-text :type="'primary'" :truncated="true">{{ v.username }}</el-text>
+                    <el-text :type="'primary'" :truncated="true">{{ v.name }}</el-text>
                   </el-col>
                   <el-col :span="8" v-if="v.owner">
                     <div style="display: flex;justify-items: center;align-content: center">

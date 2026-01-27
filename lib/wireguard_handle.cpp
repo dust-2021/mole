@@ -131,7 +131,7 @@ private:
         initial();
         WireGuardSetLogger((WIREGUARD_LOGGER_CALLBACK)&log_dll);
         // 初始化广播转发器
-        auto & trans = broadcast_trans::getInstance();
+        auto &trans = broadcast_trans::getInstance();
         trans.run();
         log(WIREGUARD_LOG_INFO, "handler created");
     }
@@ -149,7 +149,8 @@ public:
 
     WireGuardHandle &operator=(const WireGuardHandle &) = delete;
 
-    void clear() {
+    void clear()
+    {
         for (auto &room : rooms)
         {
             WireGuardCloseAdapter(room.second->handle);
@@ -158,7 +159,7 @@ public:
         // 释放winsock
         WSACleanup();
         FreeLibrary(wg);
-        auto & trans = broadcast_trans::getInstance();
+        auto &trans = broadcast_trans::getInstance();
         trans.stop_trans();
         log(WIREGUARD_LOG_INFO, "handler closed");
     }
@@ -211,7 +212,7 @@ public:
 
     // 添加成员并修改wireguard适配器配置
     _NODISCARD bool add_peer(const wchar_t *adapter_name, const wchar_t *peer_name, const u_char *pub_key,
-                             const char *ip, uint16_t port, const char **allowed_ips, size_t allowed_ip_count)
+                             const char *ip, uint16_t port, const char **allowed_ips, size_t allowed_ip_count, bool as_transporter)
     {
         if (rooms.find(adapter_name) == rooms.end())
         {
@@ -257,8 +258,12 @@ public:
             room->interface_config.PeersCount = room->peers.size();
             return false;
         };
-        auto& trans = broadcast_trans::getInstance();
-        trans.add_peer(room->peer_allowed_ips[peer_name].data(), room->peer_allowed_ips[peer_name].size());
+        // 非中转服务器，添加到广播转发列表
+        if (!as_transporter)
+        {
+            auto &trans = broadcast_trans::getInstance();
+            trans.add_peer(room->peer_allowed_ips[peer_name].data(), room->peer_allowed_ips[peer_name].size());
+        }
         return true;
     }
 
@@ -382,12 +387,12 @@ extern "C"
      * @param allowed_ips: 成员虚拟局域网网转发IP @param allowed_ips_count: 转发IP数量
      */
     EXPORT response add_peer(const wchar_t *room_name, const wchar_t *peer_name, const char *ip, const uint16_t port, const u_char *public_key,
-                             const char **allowed_ips, int allowed_ips_count)
+                             const char **allowed_ips, int allowed_ips_count, bool as_transporter)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
             return {1, L"wireguard.dll unload"};
-        if (!handle.add_peer(room_name, peer_name, public_key, ip, port, allowed_ips, allowed_ips_count))
+        if (!handle.add_peer(room_name, peer_name, public_key, ip, port, allowed_ips, allowed_ips_count, as_transporter))
             return {1, L"add peer failed"};
         return {0, L"success"};
     }
@@ -397,7 +402,8 @@ extern "C"
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
             return {1, L"wireguard.dll unload"};
-        if (!handle.update_peer_endpoint(room_name, peer_name, ip, port)) {
+        if (!handle.update_peer_endpoint(room_name, peer_name, ip, port))
+        {
             return {1, L"update failed"};
         };
         return {0, L"success"};
@@ -445,7 +451,8 @@ extern "C"
         return {0, L"success"};
     }
 
-    EXPORT void clear_all() {
+    EXPORT void clear_all()
+    {
         auto &handle = WireGuardHandle::getInstance();
         handle.clear();
     }
@@ -499,7 +506,7 @@ int main()
         113, 54, 183, 51, 253, 208, 0, 141, 85, 73, 153, 40, 209, 110, 24, 169, 158, 172, 204, 231, 13, 52, 53, 46, 53,
         186, 9, 64, 182, 167, 28, 130};
     const char *allowed_ips[] = {"10.0.0.1/32"};
-    if (const auto ok = handle.add_peer(L"test", L"peer1", peer_key, "192.168.0.100", 8767, allowed_ips, 1); !ok)
+    if (const auto ok = handle.add_peer(L"test", L"peer1", peer_key, "192.168.0.100", 8767, allowed_ips, 1, false); !ok)
     {
         return 0;
     }

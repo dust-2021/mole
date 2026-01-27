@@ -26,18 +26,37 @@ class AppConfig {
                 this.attribute.set(key[0], key[1]);
             }
         } catch (e) {
+            this.attribute.clear();
+            Logger.error(`Failed to load app config: ${e}, using default config`);
+            if (!this.attribute.has('loglevel')) {
+                this.attribute.set('loglevel', 'info');
+            }
+            if (!this.attribute.has('wgPort')) {
+                this.attribute.set('wgPort', 8080);
+            }
+            if (!this.attribute.has('udpPort')) {
+                this.attribute.set('udpPort', 8081);
+            }
             return
         }
     }
 
+    // 日志等级
     get loglevel(): string {
         const v = this.attribute.get('loglevel');
         return v !== undefined ? v : 'info';
     }
 
+    // vlan通信端口
     get wgPort(): number {
         const port = this.attribute.get('wgPort');
         return port !== undefined ? port : 8080;
+    }
+
+    // udp通信端口
+    get udpPort(): number {
+        const port = this.attribute.get('udpPort');
+        return port !== undefined ? port : 8081;
     }
 
     public get(name: string): any | undefined {
@@ -49,7 +68,7 @@ class AppConfig {
     }
 
     public save() {
-        const data = JSON.stringify(Array.from(this.attribute.values()));
+        const data = JSON.stringify(Array.from(this.attribute));
         fs.writeFileSync(AppConfig.path, data);
     }
 }

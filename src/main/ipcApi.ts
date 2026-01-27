@@ -26,7 +26,7 @@ export function initialIPC(ipc: typeof ipcMain) {
         return getMacAddress();
     })
     // nat相关接口
-    ipc.handle("nat", async (Event, method: NatMethod, ...args: any[]) => {
+    ipc.handle("udp", async (Event, method: NatMethod, ...args: any[]) => {
         return await handleIPC(method, ...args);
     });
     // 日志接口

@@ -1,5 +1,6 @@
 import { ElMessage } from "element-plus";
 import { Token } from "./token";
+import { v4 as uuid } from "uuid";
 
 export type HttpResp = {
     code: number,
@@ -70,25 +71,27 @@ export type server = {
 }
 }
 
-// nat打洞相关接口
-export const natFunc = {
-    open: async () => { return await ipcInvoke('nat', 'open'); },
-    close: async () => { return await ipcInvoke('nat', 'close'); },
-    // nat打洞，cb参数为可选的连接结果回调函数
-    connect: async (ip: string, port: number, cb?: (flag: boolean) => void) => {
+// 读取应用配置
+export async function getConfig(name: string): Promise<any> {
+    return await ipcInvoke("getConfig", name);
+}
+
+// 设置应用配置
+export async function setConfig(name: string, value: any): Promise<void> {
+    await ipcInvoke("setConfig", name, value);
+}
+
+// udp相关接口
+export const udpFunc = {
+    // 尝试udp通信，等待回调结果
+    connect: async (ip: string, port: number, timeout_s: number, cb?: (flag: boolean) => void): Promise<void> => {
+        const uid = uuid();
         if (cb) {
-            ipcOnce(`nat-connect-${ip}:${port}`, (flag: boolean) => {
+            ipcOnce(`udp-connect-${uid}`, (flag: boolean) => {
                 cb(flag);
             });
         }
-        return await ipcInvoke('nat', 'connect', ip, port);
-    },
-    disconnect: async (ip: string, port: number) => { return await ipcInvoke('nat', 'disconnect', ip, port); },
-    onLose: (address: string, func: () => void) => {
-        ipcOnce(`nat-lose-${address}`, func);
-    },
-    removeLose: (address: string, func: () => void) => {
-        ipcRemove(`nat-lose-${address}`, func);
+        await ipcInvoke('udp', 'connect', ip, port, uid, timeout_s);
     }
 }
 
@@ -110,8 +113,8 @@ export const wireguardFunc = {
     pauseAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-pauseAdapter", roomName); },
 
     addPeer: async (roomName: string, peerName: string, ip: string, port: number,
-        pub_key: string, vlan_ip: string[], vlan_ip_count: number
-    ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_ip_count); },
+        pub_key: string, vlan_ip: string[], vlan_ip_count: number, as_transporter: boolean
+    ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_ip_count, as_transporter); },
     // 删除peer
     updatePeerEndpoint: async (roomName: string, peerName: string, ip: string, port: number): Promise<boolean> => { 
         return await ipcInvoke("wireguard-updatePeerEndpoint", roomName, peerName, ip, port); },

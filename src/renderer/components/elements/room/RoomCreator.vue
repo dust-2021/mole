@@ -5,7 +5,7 @@ import {roomCreate, roomOut} from "../../../utils/api/ws/room";
 import DangerButton from "../../elements/DangerButton.vue";
 import {useRouter} from "vue-router";
 import {ElMessage} from "element-plus";
-import { roomer } from "../../../utils/roomController";
+import { roomer, member } from "../../../utils/roomController";
 import { Connection } from "../../../utils/conn";
 
 const props = defineProps({
@@ -46,7 +46,7 @@ async function submit() {
       })
       return
     };
-    const data: {roomId: string, mates: {name: string, uuid: string, id: number, owner: boolean, vlan: number, publicKey: string}[]} = r.data;
+    const data: {roomId: string, mates: member[]} = r.data;
     if (data.mates.length !== 1) {
       ElMessage({
         type: "error", message: "获取虚拟网络IP失败"
@@ -62,7 +62,7 @@ async function submit() {
       })
       return
     }
-    await room.addMember(data.mates.map((item) => {return {userId: item.id, username: item.name, userUuid: item.uuid, vlan: item.vlan, publicKey: item.publicKey, owner: item.owner}}))
+    await room.addMembers(data.mates);
     router.push(`/server/room/page/${props.serverName}/${data.roomId}`);
   })
 }

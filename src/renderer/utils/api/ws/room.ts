@@ -1,8 +1,8 @@
 import {wsRequest, wsHandleFunc} from '../../conn';
-import {wireguardFunc} from '../../publicType';
+import {getConfig, wireguardFunc} from '../../publicType';
 
 export async function roomIn(server: string, roomId: string, password?: string, handle?: wsHandleFunc) {
-    await wsRequest(server, 'room.in', [roomId, await wireguardFunc.getPublicKey(), password].filter(e => e !== undefined), handle);
+    await wsRequest(server, 'room.in', [roomId, await wireguardFunc.getPublicKey(), await getConfig("udpPort"), password].filter(e => e !== undefined), handle);
 }
 
 export async function roomOut(server: string, roomId: string, handle?: wsHandleFunc) {
@@ -30,6 +30,9 @@ export async function roomForbidden(server: string, roomId: string, to: boolean,
 	Owner     bool   `json:"owner"`
 	Vlan      int    `json:"vlan"`
 	PublicKey string `json:"publicKey"`
+	WgIp      string `json:"wgIp"`    // 成员真实IP
+	WgPort    int    `json:"wgPort"`  // 成员真实端口
+	UdpPort   int    `json:"udpPort"` // 成员本地udp端口
 }[]
  * @param server 
  * @param roomId 
@@ -49,6 +52,9 @@ export async function roomMates(server: string, roomId: string, handle?: wsHandl
 	Owner     bool   `json:"owner"`
 	Vlan      int    `json:"vlan"`
 	PublicKey string `json:"publicKey"`
+	WgIp      string `json:"wgIp"`    // 成员真实IP
+	WgPort    int    `json:"wgPort"`  // 成员真实端口
+	UdpPort   int    `json:"udpPort"` // 成员本地udp端口
 }[]
  * }
  * @param server 
@@ -60,5 +66,5 @@ export async function roomCreate(server: string, conf: {
                                      ipBlackList: string[], userIdBlackList: number[], deviceBlackList: string[], autoClose: boolean
                                  },
                                  handle?: wsHandleFunc) {
-    await wsRequest(server, 'room.create', [conf, await wireguardFunc.getPublicKey()], handle);
+    await wsRequest(server, 'room.create', [conf, await wireguardFunc.getPublicKey(), await getConfig("udpPort")], handle);
 }
