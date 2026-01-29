@@ -80,7 +80,7 @@ function pingCallback(resp: wsResp) {
 function pingTask() {
   pingTaskId = setInterval(async () => {
     await pingApi(props.serverName, pingCallback);
-  }, 2000);
+  }, 5000);
 }
 
 onBeforeMount(async () => {

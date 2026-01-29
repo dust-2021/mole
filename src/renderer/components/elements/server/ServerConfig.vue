@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import {getErrMsg, server, user} from '../../../utils/publicType'
 import {Services} from "../../../utils/stores";
-import {login} from '../../../utils/api/http/user';
+import {login, registerUser} from '../../../utils/api/http/user';
 import {wgInfo} from '../../../utils/api/http/server';
 import {ref, onBeforeMount, toRaw} from "vue";
 import {useRouter} from "vue-router";
 import {Plus, Refresh} from '@element-plus/icons-vue'
 import DangerButton from "../DangerButton.vue";
-import {ElMessageBox, ElMessage, ElText, ElFormItem} from "element-plus";
+import {ElMessageBox, ElMessage, ElFormItem, ElButton, ElInput} from "element-plus";
 
 const isNew = ref(false);
 const svr = Services();
@@ -26,6 +26,33 @@ const newUserFlag = ref<boolean>(false);
 const newUserInfo = ref<user>({
   username: '', password: '', userUuid: ''
 });
+
+// 注册弹出框
+const registerFlag = ref<boolean>(false);
+const registerInfo = ref({
+  username: '', password: '', phone: '', email: ''
+});
+
+async function commitRegister() {
+  if (!props.serverName) return;
+  const resp = await registerUser(props.serverName, registerInfo.value.username, registerInfo.value.password,
+    registerInfo.value.phone ? registerInfo.value.phone : '', registerInfo.value.email ? registerInfo.value.email : ''
+  );
+  if (resp !== 0) {
+    ElMessage({
+      type:"error", message: getErrMsg(resp)
+    });
+    
+  } else {
+    newServer.value.users.push({
+      username: registerInfo.value.username,
+      password: registerInfo.value.password,
+      userUuid: ''
+    });
+  }
+  registerInfo.value = {username: '', password: '', phone: '', email: ''};
+  registerFlag.value = false;
+}
 
 function addNewUser() {
   newUserFlag.value = false;
@@ -84,6 +111,8 @@ async function changeDefaultUser(u: user) {
   }
   if (!resp.data) return;
   newServer.value.token = resp.data;
+  // 登录后更新用户UUID，前端无法添加uuid
+  u.userUuid = resp.data.userUuid;
   newServer.value.defaultUser = u;
   ElMessage({
     type: 'success',
@@ -103,6 +132,8 @@ async function reLogin() {
   }
   if (!resp.data) return;
   newServer.value.token = resp.data;
+  // 更新uuid信息
+  newServer.value.defaultUser!.userUuid = resp.data.userUuid;
   ElMessage({
     type: 'success',
     message: 'token已刷新'
@@ -209,8 +240,27 @@ onBeforeMount(() => {
           <el-col :span="12" v-if="isNew">
             <el-button type="primary" @click="add">提交</el-button>
           </el-col>
-          <el-col :span="12" v-if="!isNew">
-            <DangerButton box-text="删除" message="是否确认删除该服务器信息？" @success="remove"></DangerButton>
+          <el-col :span="12" v-if="!isNew" style="display: flex;">
+            <div style="margin-right: 5px;"><ElButton type="primary" @click="registerFlag = true">注册账号</ElButton>
+            <el-dialog title="注册账号" v-model="registerFlag" width="400">
+          <el-form :model="registerInfo" label-width="auto" style="max-width: 60%">
+            <el-form-item label="用户名：" style="margin-top: 5px;">
+              <el-input v-model="registerInfo.username" :maxlength="32"></el-input>
+            </el-form-item>
+            <el-form-item label="密码：" style="margin-top: 5px;">
+              <el-input :type="'password'" v-model="registerInfo.password"
+                        :minlength="6"
+                        :maxlength="16"></el-input>
+            </el-form-item>
+            <ElFormItem label="手机号码：" style="margin-top: 5px;"><ElInput v-model="registerInfo.phone" :maxlength="11"></ElInput></ElFormItem>
+            <ElFormItem label="邮箱：" style="margin-top: 5px;"><ElInput v-model="registerInfo.email" :maxlength="32"></ElInput></ElFormItem>
+          </el-form>
+          <template #footer>
+            <el-button @click="registerFlag = false">取消</el-button>
+            <el-button :type="'primary'" @click="commitRegister">注册</el-button>
+          </template>
+        </el-dialog></div>
+            <div><DangerButton box-text="删除" message="是否确认删除该服务器信息？" @success="remove"></DangerButton></div>
           </el-col>
         </el-row>
       </el-form-item>

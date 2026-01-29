@@ -129,6 +129,7 @@ export const wireguardFunc = {
 const errMapping: Map<number, string> = new Map([
     [-1, "请求失败"],
     [1, "未知错误"],
+    [2, "禁止访问"],
     [10001, "报文格式错误"],
     [10002, "数据内容错误"],
     [10003, "超时"],

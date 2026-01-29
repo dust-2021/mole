@@ -20,6 +20,7 @@ const props = defineProps(
 )
 
 const mounted = ref(false);
+const freshing = ref(true);
 let info = ref<{ total: number, rooms: roomInfo[] }>({total: 0, rooms: []});
 const pageSize = ref<number>(10);
 const curPage = ref<number>(1);
@@ -30,12 +31,14 @@ const svr = ref<server>({
 const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
+  freshing.value = true;
   const resp = await roomList(props.serverName, curPage.value, pageSize.value);
   if (resp.code !== 0) {
     ElMessage({
       type: "error",
       message: getErrMsg(resp.code)
     })
+    freshing.value = false;
     return;
   }
   info.value = resp.data;
@@ -43,6 +46,7 @@ async function getRoomInfo(): Promise<void> {
     type: "success",
     message: `获取到${resp.data.total}个房间信息`
   })
+  freshing.value = false;
 }
 
 async function pageChange(v: number): Promise<void> {
@@ -117,7 +121,7 @@ function inputPassword(roomId: string): void {
 
 <template>
   <div style="height: 90%">
-    <el-table :data="filterRooms" style="width: 100%" v-if="mounted" :empty-text="svr.token?`未找到房间`: `未登录`"
+    <el-table :data="filterRooms" style="width: 100%" v-loading="freshing" :empty-text="svr.token?`未找到房间`: `未登录`"
     :max-height="500" highlight-current-row>
       <el-table-column prop="roomTitle" label="标题" width="100" show-overflow-tooltip></el-table-column>
       <el-table-column prop="description" label="房间描述" show-overflow-tooltip></el-table-column>

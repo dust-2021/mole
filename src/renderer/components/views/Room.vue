@@ -2,12 +2,13 @@
 import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
 import {wsResp} from "../../utils/publicType";
 import {useRouter} from "vue-router";
-import {ElMessage} from "element-plus";
+import {ElMessage, ElScrollbar} from "element-plus";
 import Message from "../elements/room/Message.vue";
 import SystemMessage from "../elements/room/SystemMessage.vue";
 import {roomOut, roomMessage, roomForbidden} from '../../utils/api/ws/room'
 import IconButton from "../elements/IconButton.vue";
 import { roomer, Room } from '../../utils/roomController';
+import Member from '../elements/room/Member.vue';
 
 const props = defineProps({
   serverName: {
@@ -128,34 +129,11 @@ onBeforeUnmount(async () => {
         </div>
         <div style="width: 100%;" v-if="mounted">
         </div>
-        <el-scrollbar :always="false" height="100%" max-height="100%"
-                      :noresize="true">
-          <div v-for="[k, v] in curRoom.members.value" :key="k" class="member-info">
-            <el-row :gutter="24">
-              <el-col :span="6" class="center-item">
-                <el-avatar src="" :size="32"></el-avatar>
-              </el-col>
-              <el-col :span="14">
-                <el-row :gutter="24">
-                  <el-col :span="16">
-                    <el-text :type="'primary'" :truncated="true">{{ v.name }}</el-text>
-                  </el-col>
-                  <el-col :span="8" v-if="v.owner">
-                    <div style="display: flex;justify-items: center;align-content: center">
-                      <svg :width="'16px'" :height="'16px'">
-                        <use href="#icon-badge"></use>
-                      </svg>
-                    </div>
-                  </el-col>
-                </el-row>
-              </el-col>
-            </el-row>
-          </div>
-        </el-scrollbar>
+        <Member :room-id="props.roomId"></Member>
       </el-col>
       <el-col :span="18" style="height: 100%;">
         <div style="height: 70%;display: flex; flex-direction: column">
-          <el-scrollbar :always="false" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 2px">
+          <el-scrollbar :always="false" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 10px;padding: 5px;">
             <div v-for="(message, index) in curRoom.messages.value">
               <Message :msg="message.text" :time="message.timestamp" :self="message.fromUuid === curRoom.selfUuid"
                        :username="message.fromUsername" v-if="message.fromUuid !== ''"></Message>

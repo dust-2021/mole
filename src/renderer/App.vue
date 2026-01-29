@@ -1,6 +1,6 @@
 <template>
   <el-container style="height: 100vh; margin: 0;">
-    <el-header height="36px" style="padding: 0 0 0 10px; border-bottom: 1px solid #eee">
+    <el-header height="36px" style="padding: 0 0 0 10px;">
       <div class="title-bar">
         <div style="width: 70px; padding-left: 10px; padding-top: 2px;padding-bottom: 3px">
           <svg width="40px" height="30px">
@@ -102,6 +102,7 @@ const show = ref<boolean>(false);
   position: absolute;
   top: 50%;
   left: 80px;
+  z-index: 100;
   transform: translate(-50%, -50%);
   background-color: lightgray;
   color: white;
