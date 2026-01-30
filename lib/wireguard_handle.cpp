@@ -283,7 +283,7 @@ public:
         auto old = room->peers[peer_name].Endpoint;
         if (!parse_ip(ip, port, room->peers[peer_name].Endpoint))
         {
-            log(WIREGUARD_LOG_ERR, "parse new endpoint failed");
+            log(WIREGUARD_LOG_ERR, std::string("parse new endpoint failed") + ip + ":" + std::to_string(port));
             return false;
         }
         room->peers[peer_name].Flags |= WIREGUARD_PEER_UPDATE_ONLY;

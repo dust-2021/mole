@@ -1,7 +1,7 @@
 import { Logger, Configs } from "./public";
 import dgram = require('dgram')
 import { AsyncMap } from "../shared/asynchronous";
-import { ipcRenderer } from "electron";
+import {appWindow} from "./app/window";
 
 enum UdpMsgType {
     turn = "turn",
@@ -57,8 +57,9 @@ class UdpHandler {
                     item?.timeout.close();
                     clearInterval(item?.task);
                 }).then();
+                Logger.info(`UDP connect success of ${info.address}:${info.port}`);
                 // 收到确认，向渲染进程发送成功消息
-                ipcRenderer.send(`udp-connect-${context[1]}`, true);
+                appWindow.webContents.send(`udp-connect-${context[1]}`, true);
                 break;
             case UdpMsgType.turn.toString():
 
@@ -81,7 +82,8 @@ class UdpHandler {
         const t = setTimeout(async () => {
             clearInterval(task);
             // 发送失败信号
-            ipcRenderer.send(`udp-connect-${uid}`, false)
+            Logger.info(`udp connect timeout of ${host}:${port}`);
+            appWindow.webContents.send(`udp-connect-${uid}`, false)
         }, timeout_s * 1000);
         await this.connecting.set(uid, { task: task, timeout: t });
     }

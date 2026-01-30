@@ -3,7 +3,7 @@ import { app, ipcMain } from "electron";
 import os from 'os';
 import fs = require('fs');
 import { Configs, Logger } from "./public";
-import { handleIPC, NatMethod } from "./nat";
+import { handleIPC, NatMethod } from "./udp";
 import { WgHandler } from './extern/wireguard/wireguard';
 
 // 注册主进程和渲染进程通信接口

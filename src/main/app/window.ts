@@ -2,8 +2,11 @@ import {app, BrowserWindow, ipcMain} from "electron";
 import {BaseDir} from "../public";
 import path from "path";
 
+export let appWindow: BrowserWindow ;
+
 export function mainWindow() {
-    const mainWindow = new BrowserWindow({
+
+    appWindow = new BrowserWindow({
         width: 1080,
         height: 648,
         resizable: false,
@@ -21,24 +24,24 @@ export function mainWindow() {
     });
 
     ipcMain.on('main-close', () => {
-        mainWindow.close();
+        appWindow.close();
     })
     ipcMain.on('main-min', () => {
-        mainWindow.minimize();
+        appWindow.minimize();
     })
     ipcMain.on('main-max', () => {
-        if (mainWindow.isMaximized()) {
-            mainWindow.unmaximize();
+        if (appWindow.isMaximized()) {
+            appWindow.unmaximize();
         } else {
-            mainWindow.maximize();
+            appWindow.maximize();
         }
     })
 
     // 加载 Vite 开发服务器或构建后的文件
     if (!app.isPackaged) {
-        mainWindow.loadURL('http://localhost:3000');
-        // mainWindow.webContents.openDevTools(); // 打开开发者工具
+        appWindow.loadURL('http://localhost:3000');
+        // appWindow.webContents.openDevTools(); // 打开开发者工具
     } else {
-        (mainWindow.loadFile(path.join(BaseDir, 'renderer/index.html'))).then();
+        (appWindow.loadFile(path.join(BaseDir, 'renderer/index.html'))).then();
     }
 }
