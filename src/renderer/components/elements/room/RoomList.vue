@@ -5,10 +5,10 @@ import {roomIn} from '../../../utils/api/ws/room'
 import {roomList, roomInfo} from '../../../utils/api/http/server'
 import { Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
-import {ElMessage, ElMessageBox} from "element-plus";
+import {ElMessage, ElMessageBox, ElTable, ElTableColumn} from "element-plus";
 import {useRouter} from 'vue-router';
 import { roomer, member} from "../../../utils/roomController";
-import { Connection } from "../../../utils/conn";
+import { Connection as ws } from "../../../utils/conn";
 
 const props = defineProps(
     {
@@ -104,7 +104,7 @@ function inputPassword(roomId: string): void {
         })
         return
       }
-      const  room = await roomer.createRoom(Connection.getInstance(props.serverName), roomId, props.serverName, self_vlan);
+      const  room = await roomer.createRoom(ws.getInstance(props.serverName), roomId, props.serverName, self_vlan);
       if (!room) {
         ElMessage({
           showClose: true, message: "初始化房间失败", type: "error"

@@ -34,12 +34,15 @@ void log_dll(const WIREGUARD_LOGGER_LEVEL level, int64_t dt, const wchar_t *msg)
 }
 
 void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg, int code = 0)
-{
+{   
+    // 缓存字符串，防止外部调用访问错误
+    static std::string buffer;
     if (log_func == nullptr)
     {
         return;
     }
-    log_func(level, msg, code);
+    buffer = msg;
+    log_func(level, buffer.c_str(), code);
 }
 
 struct response
