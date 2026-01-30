@@ -49,6 +49,7 @@ class UdpHandler {
         switch (context[0]) {
             case UdpMsgType.connectPeer.toString():
                 this.soc.send(udpPayload(UdpMsgType.peerReply, context[1], ""), info.port, info.address);
+                Logger.debug(`recieve udp msg from ${info.address}:${info.port}`);
                 break;
             case UdpMsgType.peerReply.toString():
                 // 接收到确认消息后，停止udp通讯请求
@@ -63,7 +64,8 @@ class UdpHandler {
                 break;
             case UdpMsgType.turn.toString():
 
-
+            default:
+                Logger.debug("unknown udp msg type: " + context[0]);
         }
     }
 

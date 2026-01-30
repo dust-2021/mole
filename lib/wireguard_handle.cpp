@@ -75,8 +75,7 @@ public:
     // interface + peer1 + allowed_ip1 + allowed_ip2 + peer2 + allowed + ...
     void *conf = nullptr;
 
-    static constexpr WIREGUARD_INTERFACE_FLAG BASE_FLAG = WIREGUARD_INTERFACE_HAS_LISTEN_PORT | WIREGUARD_INTERFACE_HAS_PRIVATE_KEY |
-                                                          WIREGUARD_INTERFACE_HAS_PUBLIC_KEY;
+    static constexpr WIREGUARD_INTERFACE_FLAG BASE_FLAG = WIREGUARD_INTERFACE_HAS_LISTEN_PORT | WIREGUARD_INTERFACE_HAS_PRIVATE_KEY;
     static constexpr WIREGUARD_PEER_FLAG BASE_PEER_FLAG = WIREGUARD_PEER_HAS_PUBLIC_KEY | WIREGUARD_PEER_HAS_ENDPOINT |
                                                           WIREGUARD_PEER_HAS_PERSISTENT_KEEPALIVE;
 
@@ -306,13 +305,14 @@ public:
         if (room->peers.find(peer_name) == room->peers.end())
             return;
         // 设置删除
-        room->peers[peer_name].Flags = WIREGUARD_PEER_REMOVE;
+        auto &peer = room->peers[peer_name];
+        peer.Flags = WIREGUARD_PEER_REMOVE | WIREGUARD_PEER_HAS_PUBLIC_KEY;
         if (!room->set_config())
         {
             log(WIREGUARD_LOG_ERR, "remove adapter peer failed");
         }
-        room->peers.erase(peer_name);
         room->peer_allowed_ips.erase(peer_name);
+        room->peers.erase(peer_name);
         room->interface_config.PeersCount = room->peers.size();
     }
 
@@ -510,8 +510,19 @@ int main()
     {
         return 0;
     }
+    const u_char peer2_key[] = {
+        113, 54, 183, 51, 253, 208, 0, 88, 85, 73, 47, 40, 209, 110, 24, 169, 158, 172, 204, 231, 13, 52, 53, 46, 53,
+        186, 9, 64, 182, 167, 28, 130};
+    const char *allowed_ips2[] = {"10.0.0.2/32"};
+    if (const auto ok = handle.add_peer(L"test", L"peer2", peer2_key, "192.168.0.101", 8769, allowed_ips2, 1, false); !ok)
+    {
+        return 0;
+    }
 
     std::cout << "Second Conf:" << get_wg_conf(handle.rooms[L"test"]->handle) << '\n';
+    // handle.del_peer(L"test", L"peer1");
+    if( !handle.update_peer_endpoint(L"test", L"peer1", "192.168.0.102", 8999)) return 0;
+    std::cout << "Third Conf:" << get_wg_conf(handle.rooms[L"test"]->handle) << '\n';
     handle.del_room(L"test");
     return 0;
 }

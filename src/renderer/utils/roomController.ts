@@ -1,6 +1,6 @@
 import { RWLock } from '../../shared/asynchronous';
 import { Connection } from './conn';
-import { wsResp, wireguardFunc, server, udpFunc } from './publicType';
+import { wsResp, wireguardFunc, server, udpFunc, log } from './publicType';
 import { ref, Ref } from 'vue';
 import { Services } from './stores';
 
@@ -227,7 +227,7 @@ async function handle(t: string, r: wsResp) {
         room = await roomer.getRoom(r.id);
         if (!room) return;
     };
-
+    log('debug', `Received ${t} message in room ${r.id}: ${JSON.stringify(r.data)}`);
     switch (t) {
         case "in":
             const data_in: member = r.data;
@@ -261,7 +261,7 @@ Connection.publicHandleByMethod.set("publish.room.notice.out", (r: wsResp) => ha
 Connection.publicHandleByMethod.set("publish.room.notice.exchangeOwner", (r: wsResp) => handle("exchangeOwner", r));
 Connection.publicHandleByMethod.set("publish.room.notice.forbidden", (r: wsResp) => handle("forbidden", r));
 Connection.publicHandleByMethod.set("publish.room.notice.close", (r: wsResp) => handle("close", r));
-Connection.publicHandleByMethod.set("publish.room.notice.updatePeerEndpoint", (r: wsResp) => handle("update", r));
+Connection.publicHandleByMethod.set("publish.room.notice.updatePeerEndpoint", (r: wsResp) => handle("updatePeerEndpoint", r));
 Connection.publicHandleByMethod.set("publish.room.message", (r: wsResp) => handle("message", r));
 
 

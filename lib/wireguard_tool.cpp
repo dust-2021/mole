@@ -30,11 +30,11 @@ void log_dll(const WIREGUARD_LOGGER_LEVEL level, int64_t dt, const wchar_t *msg)
     int size_needed = WideCharToMultiByte(CP_UTF8, 0, msg, -1, NULL, 0, NULL, NULL);
     std::string str(size_needed, 0);
     WideCharToMultiByte(CP_UTF8, 0, msg, -1, &str[0], size_needed, NULL, NULL);
-    log_func(level, str.c_str(), level == WIREGUARD_LOG_ERR? GetLastError(): 0);
+    log_func(level, str.c_str(), level == WIREGUARD_LOG_ERR ? GetLastError() : 0);
 }
 
 void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg, int code = 0)
-{   
+{
     if (log_func == nullptr)
     {
         return;
@@ -43,7 +43,7 @@ void log(const WIREGUARD_LOGGER_LEVEL level, const char *msg, int code = 0)
 }
 
 void log(const WIREGUARD_LOGGER_LEVEL level, const std::string &msg, int code = 0)
-{   
+{
     if (log_func == nullptr)
     {
         return;
@@ -72,26 +72,27 @@ static WIREGUARD_SET_CONFIGURATION_FUNC *WireGuardSetConfiguration;
 
 static HMODULE wg = nullptr;
 
-void LoadWireguardDll() {
+void LoadWireguardDll()
+{
     // 获取自身路径
     HMODULE hModule = NULL;
     GetModuleHandleExW(
-        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | 
-        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
         (LPCWSTR)&LoadWireguardDll,
-        &hModule
-    );
-    
+        &hModule);
+
     wchar_t selfPath[MAX_PATH];
     GetModuleFileNameW(hModule, selfPath, MAX_PATH);
-    
+
     // 提取目录
     std::wstring dir(selfPath);
     size_t pos = dir.find_last_of(L"\\/");
-    if (pos != std::string::npos) {
+    if (pos != std::string::npos)
+    {
         dir = dir.substr(0, pos);
     }
-    
+
     // 加载同目录的 wireguard.dll
     std::wstring wireguardPath = dir + L"\\wireguard.dll";
     wg = LoadLibraryW(wireguardPath.c_str());
@@ -99,10 +100,10 @@ void LoadWireguardDll() {
 
 // 加载wireguard动态库
 void initial()
-{   
+{
     LoadWireguardDll();
-        // LoadLibraryExW(fullpath.c_str(), nullptr,
-        //                LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+    // LoadLibraryExW(fullpath.c_str(), nullptr,
+    //                LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (wg == nullptr)
     {
         log(WIREGUARD_LOG_INFO, "load wireguard or windivert failed");
@@ -120,7 +121,7 @@ void initial()
 }
 
 bool parse_ip(const char *ip_string, int port, SOCKADDR_INET &addr)
-{   
+{
     memset(&addr, 0, sizeof(addr));
     if (inet_pton(AF_INET, ip_string, &addr.Ipv4.sin_addr) == 1)
     {
@@ -223,7 +224,7 @@ bool add_adapter_route(const NET_LUID &luid, DWORD interface_index, const char *
     return result == NO_ERROR || result == ERROR_OBJECT_ALREADY_EXISTS;
 }
 
-bool bind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char * ip_area)
+bool bind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char *ip_area)
 {
     NET_LUID luid;
     WireGuardGetAdapterLUID(handle, &luid);
@@ -385,11 +386,10 @@ namespace formmater
         // Peers 部分
         if (config->PeersCount > 0)
         {
-            const WIREGUARD_PEER *peer = reinterpret_cast<WIREGUARD_PEER *>((byte *)config + cursor);
-            cursor += peer_size;
-
             for (DWORD i = 0; i < config->PeersCount; ++i)
             {
+                const WIREGUARD_PEER *peer = reinterpret_cast<WIREGUARD_PEER *>((byte *)config + cursor);
+                cursor += peer_size;
                 ss << "[Peer #" << (i + 1) << "]\n";
 
                 // Public Key
@@ -471,11 +471,13 @@ namespace formmater
     }
 }
 
-std::string get_wg_conf(WIREGUARD_ADAPTER_HANDLE handle) {
+std::string get_wg_conf(WIREGUARD_ADAPTER_HANDLE handle)
+{
     DWORD conf_size = 0;
     WireGuardGetConfiguration(handle, nullptr, &conf_size);
-    if(conf_size == 0) return "None";
-    auto buffer = (WIREGUARD_INTERFACE*)malloc(conf_size);
+    if (conf_size == 0)
+        return "None";
+    auto buffer = (WIREGUARD_INTERFACE *)malloc(conf_size);
     WireGuardGetConfiguration(handle, buffer, &conf_size);
     auto result = formmater::wireguard_config_to_string(buffer);
     free(buffer);

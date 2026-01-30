@@ -57,7 +57,7 @@ export async function fetch(serverName: string, method: string, url: string, wit
         log(result.code === 0 ? 'info' : 'error', `${serverName} | ${url} | ${method} | ${result.code === 0 ? 'success' : result.message}`);
         return resp.data;
     } catch (e) {
-        log('error', e.toString());
+        log('error', `request failed: ${method} | ${url}` + e.toString());
         return {
             code: -1, message: ''
         }
