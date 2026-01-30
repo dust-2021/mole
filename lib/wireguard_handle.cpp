@@ -245,7 +245,7 @@ public:
             WIREGUARD_ALLOWED_IP allowed_ip = {};
             if (!parse_allowed_ip(std::string(allowed_ips[i]), allowed_ip))
             {
-                log(WIREGUARD_LOG_WARN, strcat("allowed_ip format failed: ", allowed_ips[i]));
+                log(WIREGUARD_LOG_WARN, std::string("allowed_ip format failed: ") + allowed_ips[i]);
                 continue;
             }
             room->peer_allowed_ips[peer_name].push_back(allowed_ip);

@@ -144,7 +144,7 @@ export class Room {
         this.members.value.set(m.uuid, m);
         if (m.uuid === this.selfUuid) return;
         // 进行直连尝试，失败退回转发模式
-        const vlan = this.vlanPrefix + `${m.vlan >> 8}.${m.vlan & 0xff}/32`;
+        const vlan = this.vlanPrefix + `.${m.vlan >> 8}.${m.vlan & 0xff}/32`;
         if (m.wgIp !== "" && m.wgPort !== 0) {
             await this.modifyConnFlagLocked(m.uuid, 0);
             await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
