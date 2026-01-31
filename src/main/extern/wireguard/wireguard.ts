@@ -39,6 +39,7 @@ class Wg {
         const data = generateCurve25519Key();
         this.private_key = Uint8Array.from(data.privateKey);
         this.public_key = Uint8Array.from(data.publicKey);
+        Logger.debug(`local wireguard public key: ${Buffer.from(data.publicKey).toString('base64')}`);
     }
 
     // 创建vlan局域网适配器

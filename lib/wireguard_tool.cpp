@@ -318,7 +318,7 @@ namespace formmater
         return "unknown";
     }
 
-    // 辅助函数：格式化允许的 IP 列表
+    // 格式化允许的 IP 列表
     std::string format_allowed_ips(const WIREGUARD_ALLOWED_IP *allowed_ips, size_t count)
     {
         if (!allowed_ips || count == 0)
@@ -350,7 +350,7 @@ namespace formmater
         return ss.str();
     }
 
-    // 主函数：将 WIREGUARD_INTERFACE 转换为字符串
+    // 将 WIREGUARD_INTERFACE 转换为字符串
     std::string wireguard_config_to_string(const WIREGUARD_INTERFACE *config)
     {
         if (!config)
