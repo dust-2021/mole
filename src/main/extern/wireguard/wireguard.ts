@@ -75,7 +75,7 @@ class Wg {
             Logger.info(resp.msg);
             return false;
         };
-        Logger.debug(`房间${room}添加成员：${name}，vlan：${vlan_ip}，endpoint: ${target}:${port}`);
+        Logger.debug(`房间${room}添加成员：${name}，vlan：${vlan_ip}，pub：${pub_key}，endpoint: ${target}:${port}`);
         return true;
     }
 

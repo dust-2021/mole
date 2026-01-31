@@ -2,7 +2,10 @@ import {wsRequest, wsHandleFunc} from '../../conn';
 import {getConfig, wireguardFunc} from '../../publicType';
 
 export async function roomIn(server: string, roomId: string, password?: string, handle?: wsHandleFunc) {
-    await wsRequest(server, 'room.in', [roomId, await wireguardFunc.getPublicKey(), await getConfig("udpPort"), password].filter(e => e !== undefined), handle);
+	let param = [roomId, await wireguardFunc.getPublicKey(), await getConfig("udpPort"), password];
+	if (password) param.push(password);
+	console.log(param);
+    await wsRequest(server, 'room.in', param, handle);
 }
 
 export async function roomOut(server: string, roomId: string, handle?: wsHandleFunc) {

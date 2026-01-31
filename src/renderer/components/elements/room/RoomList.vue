@@ -77,14 +77,18 @@ onBeforeMount(() => {
   mounted.value = true;
 });
 
-function inputPassword(roomId: string): void {
-  ElMessageBox.prompt("输入房间密码", "", {
+async function inputPassword(roomId: string, hasPwd: boolean): Promise<void> {
+  let pwd = "";
+  if (hasPwd) {
+    const v = await ElMessageBox.prompt("输入房间密码", "", {
     confirmButtonText: "OK", cancelButtonText: "取消",
     inputType: 'password',
     inputPattern: /\w+/,
     inputErrorMessage: "格式错误"
-  }).then(async ({value}) => {
-    await roomIn(props.serverName, roomId, value.length === 0 ? undefined : value, async (resp: wsResp) => {
+  })
+  pwd = v.value;
+  }
+    await roomIn(props.serverName, roomId, pwd.length === 0 ? undefined : pwd, async (resp: wsResp) => {
       if (resp.statusCode !== 0) {
         ElMessage({
           showClose: true,
@@ -114,7 +118,7 @@ function inputPassword(roomId: string): void {
       room.addMembers(mates);
       router.push(`/server/room/page/${props.serverName}/${roomId}`)
     })
-  })
+  
 }
 
 </script>
@@ -168,7 +172,7 @@ function inputPassword(roomId: string): void {
         </template>
         <template #default="scope">
           <el-button size="small" :disabled="scope.row.forbidden || scope.row.memberCount === scope.row.memberMax"
-                     @click="inputPassword(scope.row.roomId)">
+                     @click="inputPassword(scope.row.roomId, scope.row.withPassword)">
             <el-icon>
               <Connection></Connection>
             </el-icon>

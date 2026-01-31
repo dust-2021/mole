@@ -132,7 +132,8 @@ export class Room {
                 if (!f) {
                     this.members.value.get(uuid)!.wgIp = "";
                     this.members.value.get(uuid)!.wgPort = 0;
-                    await wireguardFunc.updatePeerEndpoint(this.roomId, uuid, this.host, this.port);
+                    // await wireguardFunc.updatePeerEndpoint(this.roomId, uuid, this.host, this.port);
+                    await wireguardFunc.delPeer(this.roomId, uuid);
                 }
             } finally { r(); }
         });
@@ -151,8 +152,9 @@ export class Room {
                 [vlan], 1, false);
             await this.checkDirectConn(m.uuid, m.name, m.wgIp, m.wgPort, 10);
         } else {
-            await wireguardFunc.addPeer(this.roomId, m.uuid, this.host, this.port, m.publicKey,
-                [vlan], 1, false);
+            // await wireguardFunc.addPeer(this.roomId, m.uuid, this.host, this.port, m.publicKey,
+            //     [vlan], 1, false);
+            return;
         }
     }
 
