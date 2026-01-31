@@ -213,7 +213,8 @@ export class Room {
             if (!peer) return;
             peer.wgIp = ip;
             peer.wgPort = port;
-            await wireguardFunc.updatePeerEndpoint(this.roomId, peer_uuid, ip, port);
+            // await wireguardFunc.updatePeerEndpoint(this.roomId, peer_uuid, ip, port);
+            await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1, false);
             await this.checkDirectConn(peer_uuid, peer.name, ip, port, 5);
         } catch (error) { } finally { r() }
     }
