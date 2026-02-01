@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElCol, ElIcon, ElRow, ElScrollbar, ElText } from 'element-plus';
+import { ElCol, ElIcon, ElRow, ElScrollbar, ElTag, ElText } from 'element-plus';
 import {onBeforeMount, ref} from 'vue';
 import { Room, roomer } from '../../../utils/roomController';
 import { Close, Refresh, Switch } from '@element-plus/icons-vue';
@@ -33,7 +33,8 @@ import { Close, Refresh, Switch } from '@element-plus/icons-vue';
                 <ElText size="large" :type="v.owner ? 'primary' : ''" :truncated="true">{{ v.name }}</ElText>
             </ElCol>
         <ElCol :span="8">
-            <ElIcon :class="{'rotating-icon': v.directFlag === 0}" v-if="v.uuid !== room.selfUuid" style="border: solid 1px;">
+            <ElTag :type="v.directFlag === 1 ? 'success': 'warning'" v-if="v.uuid !== room.selfUuid" round>
+                <ElIcon :class="{'rotating-icon': v.directFlag === 0}" >
             <Refresh v-if="v.directFlag === 0" />
             <Switch v-if="v.directFlag === 1" />
             <Close v-if="v.directFlag === 2" />
@@ -41,6 +42,7 @@ import { Close, Refresh, Switch } from '@element-plus/icons-vue';
                 <use :href="`#icon-transfer`"></use>
             </svg>
         </ElIcon>
+            </ElTag>
         </ElCol>
         </ElRow>
         </div>

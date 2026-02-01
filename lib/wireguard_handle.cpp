@@ -74,8 +74,7 @@ public:
     void *conf = nullptr;
 
     static constexpr WIREGUARD_INTERFACE_FLAG BASE_FLAG = WIREGUARD_INTERFACE_HAS_LISTEN_PORT | WIREGUARD_INTERFACE_HAS_PRIVATE_KEY;
-    static constexpr WIREGUARD_PEER_FLAG BASE_PEER_FLAG = WIREGUARD_PEER_HAS_PUBLIC_KEY | WIREGUARD_PEER_HAS_ENDPOINT |
-                                                          WIREGUARD_PEER_HAS_PERSISTENT_KEEPALIVE;
+    static constexpr WIREGUARD_PEER_FLAG BASE_PEER_FLAG = WIREGUARD_PEER_HAS_PUBLIC_KEY  | WIREGUARD_PEER_HAS_PERSISTENT_KEEPALIVE;
 
     // 设置适配器参数
     _NODISCARD bool set_config()
@@ -226,10 +225,13 @@ public:
         new_peer.Flags = room_config::BASE_PEER_FLAG;
         new_peer.PersistentKeepalive = 15;
         // 设置对端真实地址
-        if (!parse_ip(ip, port, new_peer.Endpoint))
-        {
-            log(WIREGUARD_LOG_ERR, "peer endpoint format error");
-            return false;
+        if (!strcmp(ip, "")) {
+            new_peer.Flags |= WIREGUARD_PEER_HAS_ENDPOINT;
+            if(!parse_ip(ip, port, new_peer.Endpoint))
+            {
+                log(WIREGUARD_LOG_ERR, "peer endpoint format error");
+                return false;
+            }
         }
         memcpy(new_peer.PublicKey, pub_key, WIREGUARD_KEY_LENGTH);
         new_peer.AllowedIPsCount = allowed_ip_count;

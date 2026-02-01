@@ -56,7 +56,8 @@ export interface member {
     udpPort: number,
     wgIp: string,
     wgPort: number,
-    directFlag?: 0 | 1 | 2 // undifined: 非直连, 0: 直连中, 1: 已直连, 2: 直连失败
+    // undifined: 非直连, 0: 直连中, 1: 已直连, 2: 直连失败
+    directFlag?: 0 | 1 | 2 
 }
 
 interface message {

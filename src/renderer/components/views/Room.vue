@@ -29,7 +29,14 @@ const router = useRouter();
 let curRoom: Room;
 const test = ref(new Map<string, any>())
 
-function copyRoomId(msg: string) {
+function copyLink(msg: string) {
+  if (!(curRoom.members.value.get(curRoom.selfUuid))?.owner) {
+    ElMessage({
+      type: 'warning',
+      message: '仅房主可用'
+    })
+    return;
+  };
   navigator.clipboard.writeText(msg).then(async () => {
     ElMessage({
       message: '已复制房间链接',
@@ -59,7 +66,7 @@ async function sendMessage(): Promise<void> {
 }
 
 async function forbiddenRoom() {
-  if (!(await curRoom.members.value.get(curRoom.selfUuid))?.owner) {
+  if (!(curRoom.members.value.get(curRoom.selfUuid))?.owner) {
     ElMessage({
       message: '仅房主可用',
       type: 'warning'
@@ -122,7 +129,7 @@ onBeforeUnmount(async () => {
             </el-col>
             <el-col :span="8">
               <div class="room-btn">
-                <IconButton icon="copy" :size="24" :disable="!curRoom.link" @click="copyRoomId(curRoom.link)" round></IconButton>
+                <IconButton icon="copy" :size="24" :disable="!curRoom.link" @click="copyLink(curRoom.link)" round></IconButton>
               </div>
             </el-col>
           </el-row>
