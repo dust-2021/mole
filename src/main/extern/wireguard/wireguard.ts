@@ -1,5 +1,5 @@
 import { platform } from "process";
-import {app} from 'electron';
+import { app } from 'electron';
 import { Configs, Logger } from "../../public";
 import { wgApi } from "./ctype"
 import path = require("path");
@@ -59,9 +59,19 @@ class Wg {
         Logger.info(`关闭适配器： ${name} ${f ? "成功" : "失败"}`);
         return f;
     }
-
-    public async add_peer(room: string, name: string, host: string, port: number, pub_key: string, vlan_ip: string[], 
-        vlan_ip_count: number, as_transporter: boolean): Promise<boolean> {
+    /**
+     * 
+     * @param room 房间名，直接用房间uuid
+     * @param name 成员名，直接用成员uuid
+     * @param host 成员地址
+     * @param port 成员端口
+     * @param pub_key 成员wg公钥
+     * @param vlan_ip 成员vlan地址
+     * @param vlan_ip_count 地址数量
+     * @returns 
+     */
+    public async add_peer(room: string, name: string, host: string, port: number, pub_key: string, vlan_ip: string[],
+        vlan_ip_count: number): Promise<boolean> {
         let target: string;
         if (net.isIP(host)) {
             target = host;
@@ -70,7 +80,7 @@ class Wg {
             if (ips.length == 0) return false;
             target = ips[0];
         }
-        const resp = this.lib.add_peer(room, name, target, port, Buffer.from(pub_key, "base64"), vlan_ip, vlan_ip_count, as_transporter);
+        const resp = this.lib.add_peer(room, name, target, port, Buffer.from(pub_key, "base64"), vlan_ip, vlan_ip_count);
         if (resp.code != 0) {
             Logger.info(resp.msg);
             return false;
@@ -79,19 +89,17 @@ class Wg {
         return true;
     }
 
-    public async update_peer_endpoint(room: string, peer: string, ip: string, port: number): Promise<boolean> {
-        if (!net.isIP(ip)) return false;
-        const resp = this.lib.update_peer_endpoint(room, peer, ip, port);
-        if (resp.code != 0) {
-            Logger.info(resp.msg);
-            return false;
-        };
-        Logger.debug(`房间${room}更新成员地址：${peer} : ${ip}:${port}`);
-        return true;
+    public async del_peer(room: string, name: string): Promise<boolean> {
+        Logger.info(`删除房间${room}成员：${name}`);
+        return this.lib.del_peer(room, name).code == 0;
     }
 
-    public async del_peer(room: string, name: string): Promise<boolean> {
-        return this.lib.del_peer(room, name).code == 0;
+    public async add_trans_ips(ips: string[]): Promise<void> {
+        this.lib.add_trans_ips(ips, ips.length);
+    }
+
+    public async del_trans_ips(ips: string[]): Promise<void> {
+        this.lib.del_trans_ips(ips, ips.length);
     }
 
     public async run_adapter(name: string): Promise<boolean> {
@@ -130,3 +138,28 @@ class Wg {
 }
 
 export const WgHandler: Wg = new Wg();
+
+export async function handleIPC(type_: string, ...args: any[]): Promise<any> {
+    switch (type_) {
+        case "createRoom":
+            return WgHandler.create_room(args[0], args[1], args[2]);
+        case "delRoom":
+            return WgHandler.del_room(args[0]);
+        case "runAdapter":
+            return WgHandler.run_adapter(args[0]);
+        case "pauseAdapter":
+            return WgHandler.pause_adapter(args[0]);
+        case "addPeer":
+            return WgHandler.add_peer(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
+        case "delPeer":
+            return WgHandler.del_peer(args[0], args[1]);
+        case "publicKey":
+            return Buffer.from(WgHandler.public_key).toString('base64');
+        case "addTransIps":
+            return WgHandler.add_trans_ips(args[0]);
+        case "delTransIps":
+            return WgHandler.del_trans_ips(args[0]);
+        default:
+            throw new Error(`Unknown IPC type: ${type_}`);
+    }
+}

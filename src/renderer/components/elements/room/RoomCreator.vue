@@ -46,7 +46,7 @@ async function submit() {
       })
       return
     };
-    const data: {roomId: string, mates: member[]} = r.data;
+    const data: {roomId: string, link: string, mates: member[]} = r.data;
     if (data.mates.length !== 1) {
       ElMessage({
         type: "error", message: "获取虚拟网络IP失败"
@@ -54,7 +54,7 @@ async function submit() {
       roomOut(props.serverName, data.roomId);
       return;
     }
-    const room = await roomer.createRoom(Connection.getInstance(props.serverName), data.roomId, props.serverName, data.mates[0].vlan);
+    const room = await roomer.createRoom(Connection.getInstance(props.serverName), data.roomId, props.serverName, data.mates[0].vlan, data.link);
     if (room === null) {
       ElMessage({
         type: "error",

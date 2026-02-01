@@ -32,7 +32,7 @@ const test = ref(new Map<string, any>())
 function copyRoomId(msg: string) {
   navigator.clipboard.writeText(msg).then(async () => {
     ElMessage({
-      message: '已复制房间ID',
+      message: '已复制房间链接',
       type: 'success'
     })
   })
@@ -110,19 +110,19 @@ onBeforeUnmount(async () => {
           <el-row :gutter="24" style="padding: 2px 5px;">
             <el-col :span="8">
               <div class="room-btn">
-                <IconButton :size="24" icon="leaveRoom" @click="router.go(-1)"></IconButton>
+                <IconButton :size="24" icon="leaveRoom" @click="router.go(-1)" round></IconButton>
               </div>
 
             </el-col>
             <el-col :span="8">
               <div class="room-btn">
-                <IconButton icon="unlock" :size="24" @click="forbiddenRoom" v-if="curRoom.forbidden.value"></IconButton>
-                <IconButton icon="lock" :size="24" @click="forbiddenRoom" v-else></IconButton>
+                <IconButton icon="unlock" :size="24" @click="forbiddenRoom" v-if="curRoom.forbidden.value" round></IconButton>
+                <IconButton icon="lock" :size="24" @click="forbiddenRoom" v-else round></IconButton>
               </div>
             </el-col>
             <el-col :span="8">
               <div class="room-btn">
-                <IconButton icon="copy" :size="24" @click="copyRoomId(props.roomId)"></IconButton>
+                <IconButton icon="copy" :size="24" :disable="!curRoom.link" @click="copyRoomId(curRoom.link)" round></IconButton>
               </div>
             </el-col>
           </el-row>

@@ -104,24 +104,23 @@ ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
 
 export const wireguardFunc = {
     // 创建wireguard房间，ip是本机vlan地址，ip_area是vlan网段
-    createRoom: async (roomName: string, ip: string, ip_area: string): Promise<boolean> => { return await ipcInvoke("wireguard-createRoom", roomName, ip, ip_area); },
+    createRoom: async (roomName: string, ip: string, ip_area: string): Promise<boolean> => { return await ipcInvoke("wireguard", "createRoom", roomName, ip, ip_area); },
     // 删除wireguard房间
-    delRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delRoom", roomName); },
+    delRoom: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard", "delRoom", roomName); },
     // 启动wireguard适配器
-    runAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-runAdapter", roomName); },
+    runAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard", "runAdapter", roomName); },
     // 暂停wireguard适配器
-    pauseAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard-pauseAdapter", roomName); },
+    pauseAdapter: async (roomName: string): Promise<boolean> => { return await ipcInvoke("wireguard", "pauseAdapter", roomName); },
 
     addPeer: async (roomName: string, peerName: string, ip: string, port: number,
-        pub_key: string, vlan_ip: string[], vlan_ip_count: number, as_transporter: boolean
-    ): Promise<boolean> => { return await ipcInvoke("wireguard-addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_ip_count, as_transporter); },
+        pub_key: string, vlan_ip: string[], vlan_ip_count: number
+    ): Promise<boolean> => { return await ipcInvoke("wireguard", "addPeer", roomName, peerName, ip, port, pub_key, vlan_ip, vlan_ip_count); },
     // 删除peer
-    updatePeerEndpoint: async (roomName: string, peerName: string, ip: string, port: number): Promise<boolean> => { 
-        return await ipcInvoke("wireguard-updatePeerEndpoint", roomName, peerName, ip, port); },
-    // 删除peer
-    delPeer: async (roomName: string, peerName: string): Promise<boolean> => { return await ipcInvoke("wireguard-delPeer", roomName, peerName); },
+    delPeer: async (roomName: string, peerName: string): Promise<boolean> => { return await ipcInvoke("wireguard", "delPeer", roomName, peerName); },
     // 获取base64编码格式公钥
-    getPublicKey: async (): Promise<string> => { return await ipcInvoke("wireguard-publicKey") }
+    getPublicKey: async (): Promise<string> => { return await ipcInvoke("wireguard", "publicKey"); },
+    addTransIps: async(ips: string[]): Promise<void> => {await ipcInvoke("wireguard", "addTransIps", ips);},
+    delTransIps: async(ips: string[]): Promise<void> => {await ipcInvoke("wireguard", "delTransIps", ips);},
 }
 
 // =========== Error Code ===========

@@ -4,7 +4,7 @@ import os from 'os';
 import fs = require('fs');
 import { Configs, Logger } from "./public";
 import { handleIPC, NatMethod } from "./udp";
-import { WgHandler } from './extern/wireguard/wireguard';
+import { handleIPC as wgIpc } from './extern/wireguard/wireguard';
 
 // 注册主进程和渲染进程通信接口
 export function initialIPC(ipc: typeof ipcMain) {
@@ -43,18 +43,9 @@ export function initialIPC(ipc: typeof ipcMain) {
     })
 
     // 虚拟局域网相关接口
-    ipc.handle("wireguard-createRoom", (Event, roomName: string, ip: string, ip_area: string) => { return WgHandler.create_room(roomName, ip, ip_area); })
-    ipc.handle("wireguard-delRoom", (Event, roomName: string) => { return WgHandler.del_room(roomName); })
-    ipc.handle("wireguard-runAdapter", (Event, roomName: string) => { return WgHandler.run_adapter(roomName); })
-    ipc.handle("wireguard-pauseAdapter", (Event, roomName: string) => { return WgHandler.pause_adapter(roomName); })
-    ipc.handle("wireguard-addPeer", (Event, roomName: string, peerName: string, host: string,
-        port: number, pub_key: string, vlan_ip: [string], vlan_ip_count: number, as_transporter: boolean
-    ) => { return WgHandler.add_peer(roomName, peerName, host, port, pub_key, vlan_ip, vlan_ip_count, as_transporter); })
-    ipc.handle("wireguard-updatePeerEndpoint", (Event, roomName: string, peerName: string, ip: string, port: number) => { 
-        return WgHandler.update_peer_endpoint(roomName, peerName, ip, port); })
-    ipc.handle("wireguard-delPeer", (Event, roomName: string, peerName: string) => { return WgHandler.del_peer(roomName, peerName); })
-    ipc.handle("wireguard-publicKey", (Event) => { return Buffer.from(WgHandler.public_key).toString('base64'); })
-
+    ipc.handle("wireguard", async (Event, type_: string, ...args: any[]) => {
+        return await wgIpc(type_, ...args);
+    });
 }
 
 function getMacAddress(): string {

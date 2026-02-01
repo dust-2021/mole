@@ -2,9 +2,8 @@ import {wsRequest, wsHandleFunc} from '../../conn';
 import {getConfig, wireguardFunc} from '../../publicType';
 
 export async function roomIn(server: string, roomId: string, password?: string, handle?: wsHandleFunc) {
-	let param = [roomId, await wireguardFunc.getPublicKey(), await getConfig("udpPort"), password];
-	if (password) param.push(password);
-	console.log(param);
+	let param = [roomId, await wireguardFunc.getPublicKey(), await getConfig("udpPort")];
+	if (password !== undefined && password !== "") param.push(password);
     await wsRequest(server, 'room.in', param, handle);
 }
 
@@ -47,7 +46,7 @@ export async function roomMates(server: string, roomId: string, handle?: wsHandl
 
 /**
  * 创建房间，成功返回data为 {
- * roomId：string， mates： {
+ * roomId：string,link: string, mates： {
 	Name      string `json:"name"`
 	Uuid      string `json:"uuid"`
 	Id        int    `json:"id"`

@@ -5,7 +5,7 @@ import {roomIn} from '../../../utils/api/ws/room'
 import {roomList, roomInfo} from '../../../utils/api/http/server'
 import { Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
-import {ElMessage, ElMessageBox, ElTable, ElTableColumn} from "element-plus";
+import {ElButton, ElMessage, ElMessageBox, ElTable, ElTableColumn} from "element-plus";
 import {useRouter} from 'vue-router';
 import { roomer, member} from "../../../utils/roomController";
 import { Connection as ws } from "../../../utils/conn";
@@ -77,18 +77,8 @@ onBeforeMount(() => {
   mounted.value = true;
 });
 
-async function inputPassword(roomId: string, hasPwd: boolean): Promise<void> {
-  let pwd = "";
-  if (hasPwd) {
-    const v = await ElMessageBox.prompt("输入房间密码", "", {
-    confirmButtonText: "OK", cancelButtonText: "取消",
-    inputType: 'password',
-    inputPattern: /\w+/,
-    inputErrorMessage: "格式错误"
-  })
-  pwd = v.value;
-  }
-    await roomIn(props.serverName, roomId, pwd.length === 0 ? undefined : pwd, async (resp: wsResp) => {
+async function getinRoom(roomId:string, pwd?:string) {
+  await roomIn(props.serverName, roomId, pwd, async (resp: wsResp) => {
       if (resp.statusCode !== 0) {
         ElMessage({
           showClose: true,
@@ -108,7 +98,7 @@ async function inputPassword(roomId: string, hasPwd: boolean): Promise<void> {
         })
         return
       }
-      const  room = await roomer.createRoom(ws.getInstance(props.serverName), roomId, props.serverName, self_vlan);
+      const  room = await roomer.createRoom(ws.getInstance(props.serverName), roomId, props.serverName, self_vlan, "");
       if (!room) {
         ElMessage({
           showClose: true, message: "初始化房间失败", type: "error"
@@ -118,7 +108,29 @@ async function inputPassword(roomId: string, hasPwd: boolean): Promise<void> {
       room.addMembers(mates);
       router.push(`/server/room/page/${props.serverName}/${roomId}`)
     })
-  
+}
+
+async function linkSearch(): Promise<void> {
+  const link = await ElMessageBox.prompt("输入房间链接", "", {
+    confirmButtonText: "OK", cancelButtonText: "取消",
+    inputPattern: /.+/,
+    inputErrorMessage: "格式错误",
+  })
+  getinRoom(link.value);
+}
+
+async function inputPassword(roomId: string, hasPwd: boolean): Promise<void> {
+  let pwd = "";
+  if (hasPwd) {
+    const v = await ElMessageBox.prompt("输入房间密码", "", {
+    confirmButtonText: "OK", cancelButtonText: "取消",
+    inputType: 'password',
+    inputPattern: /\w+/,
+    inputErrorMessage: "格式错误",
+  })
+  pwd = v.value;
+ };
+getinRoom(roomId, pwd);
 }
 
 </script>
@@ -189,7 +201,9 @@ async function inputPassword(roomId: string, hasPwd: boolean): Promise<void> {
       <el-col :span="4">
         <el-button @click="$router.push(`/server/room/create/${props.serverName}`)" :type="'primary'">创建</el-button>
       </el-col>
-      <el-col :span="4"></el-col>
+      <el-col :span="4">
+        <ElButton @click="linkSearch" round>链接查找</ElButton>
+      </el-col>
       <el-col :span="16">
         <el-pagination :size="'small'" background layout="prev, pager, next, jumper, sizes" :total="info.total"
                        @current-change="pageChange" :current-page="curPage" :page-size="pageSize"

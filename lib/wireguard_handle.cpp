@@ -13,8 +13,6 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define EXPORT __declspec(dllexport)
-
 // 抽象room配置类，对应一个房间和一个wireguard adapter
 class room_config
 {
@@ -211,7 +209,7 @@ public:
 
     // 添加成员并修改wireguard适配器配置
     _NODISCARD bool add_peer(const wchar_t *adapter_name, const wchar_t *peer_name, const u_char *pub_key,
-                             const char *ip, uint16_t port, const char **allowed_ips, size_t allowed_ip_count, bool as_transporter)
+                             const char *ip, uint16_t port, const char **allowed_ips, size_t allowed_ip_count)
     {
         if (rooms.find(adapter_name) == rooms.end())
         {
@@ -257,42 +255,6 @@ public:
             room->interface_config.PeersCount = room->peers.size();
             return false;
         };
-        // 非中转服务器，添加到广播转发列表
-        if (!as_transporter)
-        {
-            auto &trans = broadcast_trans::getInstance();
-            trans.add_peer(room->peer_allowed_ips[peer_name].data(), room->peer_allowed_ips[peer_name].size());
-        }
-        return true;
-    }
-
-    bool update_peer_endpoint(const wchar_t *adapter_name, const wchar_t *peer_name, const char *ip, uint16_t port)
-    {
-        if (rooms.find(adapter_name) == rooms.end())
-        {
-            log(WIREGUARD_LOG_ERR, "update peer failed for not exist room");
-            return false;
-        };
-        auto &room = rooms[adapter_name];
-        if (room->peers.find(peer_name) == room->peers.end())
-        {
-            log(WIREGUARD_LOG_ERR, "update peer not existed");
-            return false;
-        }
-        auto old = room->peers[peer_name].Endpoint;
-        if (!parse_ip(ip, port, room->peers[peer_name].Endpoint))
-        {
-            log(WIREGUARD_LOG_ERR, std::string("parse new endpoint failed") + ip + ":" + std::to_string(port));
-            return false;
-        }
-        room->peers[peer_name].Flags |= WIREGUARD_PEER_UPDATE_ONLY;
-        if (!room->set_config())
-        {
-            room->peers[peer_name].Endpoint = old;
-            room->peers[peer_name].Flags = room_config::BASE_PEER_FLAG;
-            return false;
-        };
-        room->peers[peer_name].Flags = room_config::BASE_PEER_FLAG;
         return true;
     }
 
@@ -387,26 +349,18 @@ extern "C"
      * @param allowed_ips: 成员虚拟局域网网转发IP @param allowed_ips_count: 转发IP数量
      */
     EXPORT response add_peer(const wchar_t *room_name, const wchar_t *peer_name, const char *ip, const uint16_t port, const u_char *public_key,
-                             const char **allowed_ips, int allowed_ips_count, bool as_transporter)
+                             const char **allowed_ips, int allowed_ips_count)
     {
         auto &handle = WireGuardHandle::getInstance();
         if (wg == nullptr)
             return {1, L"wireguard.dll unload"};
-        if (!handle.add_peer(room_name, peer_name, public_key, ip, port, allowed_ips, allowed_ips_count, as_transporter))
+        if (!handle.add_peer(room_name, peer_name, public_key, ip, port, allowed_ips, allowed_ips_count))
             return {1, L"add peer failed"};
         return {0, L"success"};
     }
 
-    EXPORT response update_peer_endpoint(const wchar_t *room_name, const wchar_t *peer_name, const char *ip, uint16_t port)
-    {
-        auto &handle = WireGuardHandle::getInstance();
-        if (wg == nullptr)
-            return {1, L"wireguard.dll unload"};
-        if (!handle.update_peer_endpoint(room_name, peer_name, ip, port))
-        {
-            return {1, L"update failed"};
-        };
-        return {0, L"success"};
+    EXPORT void add_trans(const char ** ips, size_t count) {
+        auto & trans = broadcast_trans::getInstance();
     }
 
     EXPORT response del_peer(const wchar_t *room_name, const wchar_t *peer_name)
@@ -506,7 +460,7 @@ int main()
         113, 54, 183, 51, 253, 208, 0, 141, 85, 73, 153, 40, 209, 110, 24, 169, 158, 172, 204, 231, 13, 52, 53, 46, 53,
         186, 9, 64, 182, 167, 28, 130};
     const char *allowed_ips[] = {"10.0.0.1/32"};
-    if (const auto ok = handle.add_peer(L"test", L"peer1", peer_key, "192.168.0.100", 8767, allowed_ips, 1, false); !ok)
+    if (const auto ok = handle.add_peer(L"test", L"peer1", peer_key, "192.168.0.100", 8767, allowed_ips, 1); !ok)
     {
         return 0;
     }
@@ -514,14 +468,13 @@ int main()
         113, 54, 183, 51, 253, 208, 0, 88, 85, 73, 47, 40, 209, 110, 24, 169, 158, 172, 204, 231, 13, 52, 53, 46, 53,
         186, 9, 64, 182, 167, 28, 130};
     const char *allowed_ips2[] = {"10.0.0.2/32"};
-    if (const auto ok = handle.add_peer(L"test", L"peer2", peer2_key, "192.168.0.101", 8769, allowed_ips2, 1, false); !ok)
+    if (const auto ok = handle.add_peer(L"test", L"peer2", peer2_key, "192.168.0.101", 8769, allowed_ips2, 1); !ok)
     {
         return 0;
     }
 
     std::cout << "Second Conf:" << get_wg_conf(handle.rooms[L"test"]->handle) << '\n';
     // handle.del_peer(L"test", L"peer1");
-    if( !handle.update_peer_endpoint(L"test", L"peer1", "192.168.0.102", 8999)) return 0;
     std::cout << "Third Conf:" << get_wg_conf(handle.rooms[L"test"]->handle) << '\n';
     handle.del_room(L"test");
     return 0;

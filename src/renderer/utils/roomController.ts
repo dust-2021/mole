@@ -9,7 +9,7 @@ class RoomController {
     private lock: RWLock = new RWLock();
 
     // 创建房间时，必须已获取vlanIP，创建房间自动添加中继服务器
-    public async createRoom(conn: Connection, id: string, svr: string, vlan: number): Promise<Room | null> {
+    public async createRoom(conn: Connection, id: string, svr: string, vlan: number, link: string): Promise<Room | null> {
         const s = Services().get(svr);
         if (!s || !s.wgInfo) return null;
         const r = await this.lock.acquireWrite();
@@ -19,12 +19,12 @@ class RoomController {
                 `${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.0`) ||
                 // 添加中继服务器peer
                 !await wireguardFunc.addPeer(id, s.wgInfo.publicKey, s.host, s.wgInfo.listenPort, s.wgInfo.publicKey,
-                    [`${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.1/16`], 1, true) ||
+                    [`${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.1/16`], 1) ||
                 !await wireguardFunc.runAdapter(id)) {
                 await wireguardFunc.delRoom(id);
                 return null;
             };
-            const room = new Room(conn, id, s);
+            const room = new Room(conn, id, s, link);
             this.AllRoom.set(id, room);
             return room;
         } catch (error) { return null; } finally { r(); }
@@ -71,6 +71,7 @@ export class Room {
     private lock: RWLock = new RWLock();
     public readonly conn: Connection;
     public readonly roomId: string;
+    public readonly link: string;
     public readonly selfUuid: string;
 
     // vue组件可访问的响应式数据
@@ -85,12 +86,13 @@ export class Room {
     private readonly port: number = 0;
     private readonly vlanPrefix: string = "";
 
-    public constructor(conn: Connection, id: string, svr: server) {
+    public constructor(conn: Connection, id: string, svr: server, link: string) {
         if (!svr.wgInfo || !svr.token) throw new Error("error svr");
         this.conn = conn;
         this.roomId = id;
         this.host = svr.host;
         this.port = svr.wgInfo?.listenPort;
+        this.link = link;
         this.vlanPrefix = `${svr.wgInfo.vlanIp[0]}.${svr.wgInfo.vlanIp[1]}`;
         this.selfUuid = svr.token.userUuid;
     }
@@ -114,6 +116,7 @@ export class Room {
         }
     }
 
+    // 无锁修改链接状态标识符
     private async modifyConnFlagLocked(uid: string, to: 0 | 1 | 2) {
         if (!this.members.value.has(uid)) return;
         this.members.value.get(uid)!.directFlag = to;
@@ -144,12 +147,13 @@ export class Room {
         if (this.members.value.has(m.uuid)) return;
         this.members.value.set(m.uuid, m);
         if (m.uuid === this.selfUuid) return;
-        // 进行直连尝试，失败退回转发模式
-        const vlan = this.vlanPrefix + `.${m.vlan >> 8}.${m.vlan & 0xff}/32`;
+        // 具有真实公网地址进行直连尝试，失败退回转发模式
+        const vlan = this.vlanPrefix + `.${m.vlan >> 8}.${m.vlan & 0xff}`;
+        await wireguardFunc.addTransIps([vlan]);
         if (m.wgIp !== "" && m.wgPort !== 0) {
             await this.modifyConnFlagLocked(m.uuid, 0);
             await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
-                [vlan], 1, false);
+                [vlan], 1);
             await this.checkDirectConn(m.uuid, m.name, m.wgIp, m.wgPort, 10);
         } else {
             // await wireguardFunc.addPeer(this.roomId, m.uuid, this.host, this.port, m.publicKey,
@@ -179,6 +183,7 @@ export class Room {
             this.members.value.delete(userUUid);
             // if (!await wireguardFunc.pauseAdapter(this.roomId)) return;
             await wireguardFunc.delPeer(this.roomId, userUUid);
+            await wireguardFunc.delTransIps([`${this.vlanPrefix}.${mem.vlan >> 8}.${mem.vlan & 0xff}`]);
             // await wireguardFunc.runAdapter(this.roomId);
         } catch (error) { } finally { r() }
     }
@@ -205,7 +210,13 @@ export class Room {
         } catch (error) { } finally { r() };
     }
 
-    // 更新成员真实地址信息
+    /**
+     * 获取到成员真实公网地址后，wg添加一个点对点peer并进行直连尝试
+     * @param peer_uuid 
+     * @param ip 
+     * @param port 
+     * @returns 
+     */
     public async updateEndpoint(peer_uuid: string, ip: string, port: number) {
         const r = await this.lock.acquireWrite();
         try {
@@ -214,8 +225,8 @@ export class Room {
             peer.wgIp = ip;
             peer.wgPort = port;
             // await wireguardFunc.updatePeerEndpoint(this.roomId, peer_uuid, ip, port);
-            await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1, false);
-            await this.checkDirectConn(peer_uuid, peer.name, ip, port, 5);
+            await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
+            await this.checkDirectConn(peer_uuid, peer.name, ip, port, 10);
         } catch (error) { } finally { r() }
     }
 }

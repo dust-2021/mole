@@ -8,11 +8,6 @@
 
 #pragma comment(lib, "lib/src/WinDivert.lib")
 
-bool isLittleEndianSimple() {
-    uint16_t test = 0x0001;
-    return *reinterpret_cast<uint8_t*>(&test) == 0x01;
-}
-
 // 用于转发三层网络中的广播数据包到wireguard隧道
 class broadcast_trans
 {
@@ -28,37 +23,28 @@ public:
         return bt_instance;
     }
 
-    void add_peer(uint32_t ip)
-    {
-        std::unique_lock<std::shared_mutex> lock(peer_rw_lock);
-        peers.insert(ip);
-    }
-
-    void add_peer(const WIREGUARD_ALLOWED_IP *ip, size_t count)
+     void add_ips(const char **ips, size_t count)
     {
         std::unique_lock<std::shared_mutex> lock(peer_rw_lock);
         for (size_t i = 0; i < count; i++)
         {
-            peers.insert(ip[i].Address.V4.S_un.S_addr);
+            if (inet_addr(ips[i]) == INADDR_NONE)
+                continue;
+            peers.insert(inet_addr(ips[i]));
         }
     }
 
-    void del_peer(uint32_t ip)
-    {
-        std::unique_lock<std::shared_mutex> lock(peer_rw_lock);
-        peers.erase(ip);
-    }
-
-    void del_peer(const WIREGUARD_ALLOWED_IP *ip, size_t count)
+     void del_ips(const char **ips, size_t count)
     {
         std::unique_lock<std::shared_mutex> lock(peer_rw_lock);
         for (size_t i = 0; i < count; i++)
         {
-            peers.erase(ip[i].Address.V4.S_un.S_addr);
+            peers.erase(inet_addr(ips[i]));
         }
     }
 
-    void stop_trans() {
+    void stop_trans()
+    {
         stop = true;
         WinDivertClose(windivert_handle);
     }
@@ -122,7 +108,8 @@ private:
     std::atomic<bool> stop{false};
     static HANDLE windivert_handle;
 
-    broadcast_trans(){
+    broadcast_trans()
+    {
         // 获取windivert句柄，设置为嗅探模式
         windivert_handle = WinDivertOpen(filter, WINDIVERT_LAYER_NETWORK, 0, WINDIVERT_FLAG_SNIFF);
         if (windivert_handle == INVALID_HANDLE_VALUE)
@@ -135,3 +122,17 @@ private:
 const char *broadcast_trans::filter = "outbound and ip.DstAddr == 255.255.255.255";
 broadcast_trans broadcast_trans::bt_instance;
 HANDLE broadcast_trans::windivert_handle = NULL;
+
+extern "C"
+{
+    EXPORT void add_trans_ips(const char **ips, size_t count)
+    {
+        broadcast_trans::getInstance().add_ips(ips, count);
+    }
+
+    EXPORT void del_trans_ips(const char **ips, size_t count)
+    {
+        broadcast_trans::getInstance().del_ips(ips, count);
+    }
+
+} 

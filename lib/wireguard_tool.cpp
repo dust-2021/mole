@@ -10,6 +10,8 @@
 #pragma once
 #pragma comment(lib, "iphlpapi.lib")
 
+#define EXPORT __declspec(dllexport)
+
 namespace fs = std::filesystem;
 
 static constexpr size_t interface_size = sizeof(WIREGUARD_INTERFACE);

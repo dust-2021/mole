@@ -88,10 +88,11 @@ export const WireGuardAPI: CType.wgApi = {
     ]),
     del_adapter: wg.func("del_adapter", CType.c_type.response, [CType.c_type.LPCWSTR]),
     add_peer: wg.func("add_peer", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR, CType.c_type.LPCSTR, koffi.types.uint16,
-    koffi.pointer(koffi.types.uchar), koffi.pointer(CType.c_type.LPCSTR), koffi.types.int, koffi.types.bool
+    koffi.pointer(koffi.types.uchar), koffi.pointer(CType.c_type.LPCSTR), koffi.types.int
     ]),
-    update_peer_endpoint: wg.func("update_peer_endpoint", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR, CType.c_type.LPCSTR, koffi.types.uint16]),
     del_peer: wg.func("del_peer", CType.c_type.response, [CType.c_type.LPCWSTR, CType.c_type.LPCWSTR]),
+    add_trans_ips: wg.func("add_trans_ips", koffi.types.void, [koffi.pointer(CType.c_type.LPCSTR), koffi.types.size_t]),
+    del_trans_ips: wg.func("del_trans_ips", koffi.types.void, [koffi.pointer(CType.c_type.LPCSTR), koffi.types.size_t]),
     run_adapter: wg.func("run_adapter", CType.c_type.response, [CType.c_type.LPCWSTR]),
     pause_adapter: wg.func("pause_adapter", CType.c_type.response, [CType.c_type.LPCWSTR]),
     get_adapter_config: wg.func("get_adapter_config", CType.c_type.response, [CType.c_type.LPCWSTR, koffi.pointer(koffi.types.char), koffi.types.int]),

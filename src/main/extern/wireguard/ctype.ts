@@ -25,10 +25,11 @@ export interface wgApi {
     create_adapter: (name: string, public_key: Buffer, private_key: Buffer, adaper_ip: string, ip_area: string, listen_port: number) => Response,
     del_adapter: (name: string) => Response,
     add_peer: (adapter_name: string, peer_name: string, ip: string, port: number, public_key: Buffer,
-        transport_ip: string[], count: number, as_transporter: boolean
+        transport_ip: string[], count: number
     ) => Response,
-    update_peer_endpoint: (adapter_name: string, peer_name: string, ip: string, port: number) => Response,
     del_peer: (adapter_name: string, peer_name: string) => Response,
+    add_trans_ips: (ips: string[], count: number) => void,
+    del_trans_ips: (ips: string[], count: number) => void,
     // 启动适配器
     run_adapter: (name: string) => Response,
     // 停止适配器
