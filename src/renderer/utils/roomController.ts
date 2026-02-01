@@ -152,10 +152,10 @@ export class Room {
         const vlan = this.vlanPrefix + `.${m.vlan >> 8}.${m.vlan & 0xff}`;
         await wireguardFunc.addTransIps([vlan]);
         if (m.wgIp !== "" && m.wgPort !== 0) {
-            await this.modifyConnFlagLocked(m.uuid, 0);
-            await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
-                [vlan], 1);
-            await this.checkDirectConn(m.uuid, m.name, m.wgIp, m.wgPort, 10);
+            // await this.modifyConnFlagLocked(m.uuid, 0);
+            // await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
+            //     [vlan], 1);
+            // await this.checkDirectConn(m.uuid, m.name, m.wgIp, m.wgPort, 10);
         } else {
             // await wireguardFunc.addPeer(this.roomId, m.uuid, this.host, this.port, m.publicKey,
             //     [vlan], 1, false);
@@ -226,8 +226,8 @@ export class Room {
             peer.wgIp = ip;
             peer.wgPort = port;
             // await wireguardFunc.updatePeerEndpoint(this.roomId, peer_uuid, ip, port);
-            await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
-            await this.checkDirectConn(peer_uuid, peer.name, ip, port, 10);
+            // await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
+            // await this.checkDirectConn(peer_uuid, peer.name, ip, port, 10);
         } catch (error) { } finally { r() }
     }
 }

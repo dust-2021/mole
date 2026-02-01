@@ -225,7 +225,7 @@ public:
         new_peer.Flags = room_config::BASE_PEER_FLAG;
         new_peer.PersistentKeepalive = 15;
         // 设置对端真实地址
-        if (!strcmp(ip, "")) {
+        if (ip != nullptr && ip[0] != '\0') {
             new_peer.Flags |= WIREGUARD_PEER_HAS_ENDPOINT;
             if(!parse_ip(ip, port, new_peer.Endpoint))
             {
