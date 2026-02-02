@@ -85,7 +85,7 @@ export class Room {
     // 服务器wg信息
     private readonly host: string = "";
     private readonly port: number = 0;
-    private readonly vlanPrefix: string = "";
+    public readonly vlanPrefix: string = "";
 
     public constructor(conn: Connection, id: string, svr: server, link: string) {
         if (!svr.wgInfo || !svr.token) throw new Error("error svr");
@@ -152,15 +152,12 @@ export class Room {
         const vlan = this.vlanPrefix + `.${m.vlan >> 8}.${m.vlan & 0xff}`;
         await wireguardFunc.addTransIps([vlan]);
         if (m.wgIp !== "" && m.wgPort !== 0) {
-            // await this.modifyConnFlagLocked(m.uuid, 0);
-            // await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
-            //     [vlan], 1);
-            // await this.checkDirectConn(m.uuid, m.name, m.wgIp, m.wgPort, 10);
-        } else {
-            // await wireguardFunc.addPeer(this.roomId, m.uuid, this.host, this.port, m.publicKey,
-            //     [vlan], 1, false);
-            return;
-        }
+            await this.modifyConnFlagLocked(m.uuid, 0);
+            await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
+                [vlan], 1);
+            await this.checkDirectConn(m.uuid, m.name, vlan, m.udpPort, 10);
+        };
+        this.addMsgLocked([{ fromUuid: "", text: `${m.name}加入房间`, timestamp: Date.now(), fromUsername: "" }]);
     }
 
     public async addMembers(m: member[]) {
@@ -225,9 +222,8 @@ export class Room {
             if (!peer) return;
             peer.wgIp = ip;
             peer.wgPort = port;
-            // await wireguardFunc.updatePeerEndpoint(this.roomId, peer_uuid, ip, port);
-            // await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
-            // await this.checkDirectConn(peer_uuid, peer.name, ip, port, 10);
+            await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
+            await this.checkDirectConn(peer_uuid, peer.name, this.vlanPrefix + `.${peer.vlan >> 8}.${peer.vlan & 0xff}`, peer.udpPort, 10);
         } catch (error) { } finally { r() }
     }
 }

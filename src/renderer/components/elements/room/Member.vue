@@ -25,12 +25,15 @@ import { Close, Refresh, Switch } from '@element-plus/icons-vue';
 </script>
 <template>
 
- <ElScrollbar :always="false" v-if="mounted" style="width: 100%;height: 80%;" class="member-band">
-    
-        <div style="width: 100%;">
-            <ElRow :gutter="24" v-for=" [k, v] of room.members.value" :key="k">
+ <ElScrollbar :always="false" v-if="mounted" style="height: 80%;">
+
+            <ElRow style="height: 60px;margin: 5px; border: 1px solid #eee; border-radius: 5px;" 
+            :gutter="24" v-for=" [k, v] of room.members.value" :key="k">
             <ElCol :span="16">
-                <ElText size="large" :type="v.owner ? 'primary' : ''" :truncated="true">{{ v.name }}</ElText>
+                <div style="width: 100%;height: 32px;">
+                    <ElText style="height: 100%;" size="large" :type="v.owner ? 'primary' : ''" :truncated="true">{{ v.name }} <ElTag size="small" v-if="v.owner">主机</ElTag></ElText>
+                </div>
+                <div style="width: 100%;height: 16px;"><ElText style="height: 100%;" size="small"> vlan: {{ `${room.vlanPrefix}.${v.vlan >> 8}.${v.vlan & 0xff}` }}</ElText></div>
             </ElCol>
         <ElCol :span="8">
             <ElTag :type="v.directFlag === 1 ? 'success': 'warning'" v-if="v.uuid !== room.selfUuid" round>
@@ -45,17 +48,10 @@ import { Close, Refresh, Switch } from '@element-plus/icons-vue';
             </ElTag>
         </ElCol>
         </ElRow>
-        </div>
  </ElScrollbar>
 </template>
 
 <style scoped>
-
-.member-band {
-    padding-left: 5px; align-items: center;
-    margin: 5px;
-    border-radius: 5px;
-}
 
 .rotating-icon {
   animation: rotate 2s linear infinite;

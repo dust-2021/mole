@@ -112,8 +112,8 @@ onBeforeUnmount(async () => {
 <template>
   <div style="height: 100%;width: 100%">
     <el-row :gutter="24" v-if="mounted" style="height: 100%;width: 100%">
-      <el-col :span="6" style="height: 100%;border-right: 1px solid #eee;">
-        <div style="margin-bottom: 1px">
+      <el-col :span="6" style="height: 100%; width: 100%;border-right: 1px solid #eee;">
+        <div style="margin-bottom: 1px;">
           <el-row :gutter="24" style="padding: 2px 5px;">
             <el-col :span="8">
               <div class="room-btn">
@@ -129,18 +129,18 @@ onBeforeUnmount(async () => {
             </el-col>
             <el-col :span="8">
               <div class="room-btn">
-                <IconButton icon="copy" :size="24" :disable="!curRoom.link" @click="copyLink(curRoom.link)" round></IconButton>
+                <IconButton icon="copy" :size="24" @click="copyLink(curRoom.link)" round></IconButton>
               </div>
             </el-col>
           </el-row>
         </div>
         <div style="width: 100%;" v-if="mounted">
+          <Member :room-id="props.roomId"></Member>
         </div>
-        <Member :room-id="props.roomId"></Member>
       </el-col>
       <el-col :span="18" style="height: 100%;">
         <div style="height: 70%;display: flex; flex-direction: column">
-          <el-scrollbar :always="false" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 10px;padding: 5px;">
+          <el-scrollbar :always="false" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 10px;padding: 5px; margin-top: 5px;">
             <div v-for="(message, index) in curRoom.messages.value">
               <Message :msg="message.text" :time="message.timestamp" :self="message.fromUuid === curRoom.selfUuid"
                        :username="message.fromUsername" v-if="message.fromUuid !== ''"></Message>

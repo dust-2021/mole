@@ -31,6 +31,7 @@ public:
             if (inet_addr(ips[i]) == INADDR_NONE)
                 continue;
             peers.insert(inet_addr(ips[i]));
+            log(WIREGUARD_LOG_INFO, std::string("add broadcast peer ip:") + ips[i]);
         }
     }
 
@@ -40,6 +41,7 @@ public:
         for (size_t i = 0; i < count; i++)
         {
             peers.erase(inet_addr(ips[i]));
+            log(WIREGUARD_LOG_INFO, std::string("del broadcast peer ip:") + ips[i]);
         }
     }
 
