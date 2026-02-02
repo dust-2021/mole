@@ -226,6 +226,13 @@ export class Room {
             await this.checkDirectConn(peer_uuid, peer.name, this.vlanPrefix + `.${peer.vlan >> 8}.${peer.vlan & 0xff}`, peer.udpPort, 10);
         } catch (error) { } finally { r() }
     }
+
+    public async printWg() {
+        const r = await this.lock.acquireWrite();
+        try{
+            this.addMsgLocked([{fromUuid: this.selfUuid, fromUsername: "", text: await wireguardFunc.getAdapterConfig(this.roomId), timestamp: Date.now()}]);
+        } finally {r()};
+    }
 }
 
 export const roomer = new RoomController();

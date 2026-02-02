@@ -121,6 +121,7 @@ export const wireguardFunc = {
     getPublicKey: async (): Promise<string> => { return await ipcInvoke("wireguard", "publicKey"); },
     addTransIps: async(ips: string[]): Promise<void> => {await ipcInvoke("wireguard", "addTransIps", ips);},
     delTransIps: async(ips: string[]): Promise<void> => {await ipcInvoke("wireguard", "delTransIps", ips);},
+    getAdapterConfig: async(roomName: string): Promise<string> =>{ return await ipcInvoke("wireguard","getAdapterConfig", roomName);}
 }
 
 // =========== Error Code ===========

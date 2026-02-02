@@ -159,6 +159,8 @@ export async function handleIPC(type_: string, ...args: any[]): Promise<any> {
             return WgHandler.add_trans_ips(args[0]);
         case "delTransIps":
             return WgHandler.del_trans_ips(args[0]);
+        case "getAdapterConfig":
+            return WgHandler.get_adapter_config(args[0]);
         default:
             throw new Error(`Unknown IPC type: ${type_}`);
     }

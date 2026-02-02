@@ -54,7 +54,7 @@ class UdpHandler {
             case UdpMsgType.peerReply.toString():
                 // 接收到确认消息后，停止udp通讯请求
                 this.connecting.withLock((m) => {
-                    const item = m.get(`${info.address}:${info.port}`);
+                    const item = m.get(context[1]);
                     item?.timeout.close();
                     clearInterval(item?.task);
                 }).then();
