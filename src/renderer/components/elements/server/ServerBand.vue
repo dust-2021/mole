@@ -45,6 +45,12 @@ async function activeCon() {
     if (!(await conn.active(()=> {
       if(pingTaskId) clearInterval(pingTaskId);
       connected.value = 0;
+      ElMessage({
+        type: "warning", message: `已断开${props.serverName}连接`,
+      })
+      if (router.currentRoute.value.name === "room") {
+        router.go(-1);
+      }
     }))) {
       connected.value = 0;
       ElMessage({

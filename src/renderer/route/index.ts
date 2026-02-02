@@ -16,7 +16,7 @@ const routes: RouteRecordRaw[] = [
             {
                 path: "room",
                 children: [
-                    {path: 'page/:serverName/:roomId', components: {default: Room, middle: ServerItems}, props: true},
+                    {path: 'page/:serverName/:roomId', components: {default: Room, middle: ServerItems}, props: true, name: "room"},
                     {path: 'create/:serverName', components: {default: RoomCreator, middle: ServerItems}, props: true},
                 ]
             }

@@ -30,7 +30,7 @@ class UdpHandler {
         this.port = Configs.udpPort;
         this.soc = dgram.createSocket('udp4');
         this.slaveSoc = dgram.createSocket('udp4');
-        this.soc.on('message', this.listener);
+        this.soc.on('message', (msg, info) => {return this.listener(msg, info)});
         this.slaveSoc.on("message", (msg: Buffer, info: dgram.RemoteInfo) => {
             const message = msg.toString('utf-8').split('\r\n');
             // TODO: nat类型确认逻辑
@@ -43,7 +43,7 @@ class UdpHandler {
 
     // udp监听处理函数
     private listener(message: Buffer, info: dgram.RemoteInfo) {
-        Logger.info(`Received message ${message} from ${info.address}:${info.port}`);
+        Logger.debug(`Received message ${message} from ${info.address}:${info.port}`);
         const context = message.toString('utf-8').split('\r\n');
         if (context.length !== 3) return;
         switch (context[0]) {
