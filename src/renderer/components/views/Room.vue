@@ -159,7 +159,7 @@ onBeforeUnmount(async () => {
             </el-col>
             <el-col :span="1">
               <el-button @click="sendMessage">发送</el-button>
-              <el-button @click="curRoom.printWg()">打印wg信息</el-button>
+              <!-- <el-button @click="curRoom.printWg()">打印wg信息</el-button> -->
             </el-col>
           </el-row>
         </div>
