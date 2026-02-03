@@ -30,29 +30,6 @@ const FormatMessageA = win32.func('FormatMessageA', 'uint32', [
     CType.c_type.UNKNOWN_POINTER  // Arguments
 ]);
 
-export function checkDLLError(): string {
-    const code = GetLastError();
-    if (code === 0) {
-        return "";
-    }
-    const msg = Buffer.alloc(256);
-    const length = FormatMessageA(0x00001000 | 0x00000200,
-        null,
-        code,
-        0,
-        msg,
-        256,
-        null
-    );
-    if (length === 0) {
-        Logger.warn('获取dll错误信息失败');
-        return "";
-    }
-    let message = iconv.decode(msg.subarray(0, length), 'gbk');
-    message = message.replace(/[\r\n]+$/, '');
-    return message;
-}
-
 function logger_callback(level: number, msg: string, code: number) {
     let level_s = "info";
     switch (level) {

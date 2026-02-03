@@ -5,7 +5,7 @@
         <use :href="`#icon-${icon}`"/>
       </svg></span>
       </div>
-      <div class="center-style" v-if="label"><span style="text-align: center">{{ label }}</span></div>
+      <div class="center-style" v-if="label"><span style="text-align: center;">{{ label }}</span></div>
     </el-button>
 </template>
 <script setup lang="ts">
@@ -22,7 +22,7 @@ const props = defineProps({
     default: 24,
   },
   label: {
-    type: String
+    type: String 
   },
   btnSize: {
     type: String as PropType<'small' | 'medium' | 'large'>,

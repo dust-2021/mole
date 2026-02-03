@@ -33,7 +33,7 @@ export async function roomList(serverName: string, page: number = 1, size: numbe
     return {code: 0, data: resp.data};
 }
 
-
+// 服务器wg信息
 export async function wgInfo(serverName: string): Promise<{code: number, data: {publicKey: string, listenPort: number,
     vlanIp: [number, number]
 }}> {
@@ -42,4 +42,13 @@ export async function wgInfo(serverName: string): Promise<{code: number, data: {
         return {code: resp.code, data: {publicKey: "", listenPort: 0, vlanIp: [0, 0]}};
     }
     return {code: 0, data: resp.data}; 
+}
+
+// 服务器当前连接信息
+export async function connectingInfo(serverName: string): Promise<{serverTime: number, wsConnected: number, wgPeers: number, rooms: number}> {
+    const resp = await fetch(serverName, 'get', 'sapi/info/connecting', true);
+    if (resp.code !== 0) {
+        return {serverTime: 0, wsConnected: 0, wgPeers: 0, rooms: 0};
+    }
+    return resp.data;
 }

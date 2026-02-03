@@ -2,10 +2,10 @@
 import {onBeforeMount, ref, computed} from "vue";
 import {getErrMsg, server, wsResp} from "../../../utils/publicType";
 import {roomIn} from '../../../utils/api/ws/room'
-import {roomList, roomInfo} from '../../../utils/api/http/server'
+import {roomList, roomInfo, connectingInfo} from '../../../utils/api/http/server'
 import { Lock, Unlock, Refresh, CircleCloseFilled} from "@element-plus/icons-vue"
 import {Services} from "../../../utils/stores";
-import {ElButton, ElMessage, ElMessageBox, ElTable, ElTableColumn} from "element-plus";
+import {ElButton, ElCol, ElIcon, ElMessage, ElMessageBox, ElRow, ElTable, ElTableColumn, ElText} from "element-plus";
 import {useRouter} from 'vue-router';
 import { roomer, member} from "../../../utils/roomController";
 import { Connection as ws } from "../../../utils/conn";
@@ -28,6 +28,23 @@ const services = Services();
 const svr = ref<server>({
   host: "", port: 0, certify: false, users: []
 });
+
+const connectInfo = ref({wsConnected: 0, wgPeers: 0, rooms: 0});
+
+async function getConnectInfo() {
+  const data = await connectingInfo(props.serverName);
+  if (data.serverTime === 0) {
+    ElMessage({
+      type: "error", message: "刷新失败"
+    })
+    return
+  }
+  connectInfo.value.wsConnected = data.wsConnected;
+  connectInfo.value.wgPeers = data.wgPeers;
+  connectInfo.value.rooms = data.rooms;
+
+}
+
 const router = useRouter();
 
 async function getRoomInfo(): Promise<void> {
@@ -47,6 +64,7 @@ async function getRoomInfo(): Promise<void> {
     message: `获取到${resp.data.total}个房间信息`
   })
   freshing.value = false;
+  getConnectInfo();
 }
 
 async function pageChange(v: number): Promise<void> {
@@ -137,7 +155,7 @@ getinRoom(roomId, pwd);
 
 <template>
   <div style="height: 90%">
-    <el-table :data="filterRooms" style="width: 100%" v-loading="freshing" :empty-text="svr.token?`未找到房间`: `未登录`"
+    <el-table :data="filterRooms" height="95%" style="width: 100%" v-loading="freshing" :empty-text="svr.token?`未找到房间`: `未登录`"
     :max-height="500" highlight-current-row>
       <el-table-column prop="roomTitle" label="标题" width="100" show-overflow-tooltip></el-table-column>
       <el-table-column prop="description" label="房间描述" show-overflow-tooltip></el-table-column>
@@ -167,7 +185,7 @@ getinRoom(roomId, pwd);
 
         </template>
       </el-table-column>
-      <el-table-column align="right" width="180">
+      <el-table-column width="180" fixed="right">
         <template #header>
           <el-row :gutter="24">
             <el-col :span="6">
@@ -196,21 +214,37 @@ getinRoom(roomId, pwd);
       </el-table-column>
     </el-table>
   </div>
-  <el-footer height="10%" style="justify-items: right;">
-    <el-row :gutter="24" style="width: 100%">
+  <el-footer height="10%">
+    <div>
+      <el-row :gutter="24" style="width: 100%">
       <el-col :span="4">
         <el-button @click="$router.push(`/server/room/create/${props.serverName}`)" :type="'primary'">创建</el-button>
       </el-col>
       <el-col :span="4">
         <ElButton @click="linkSearch" round>链接查找</ElButton>
       </el-col>
-      <el-col :span="16">
-        <el-pagination :size="'small'" background layout="prev, pager, next, jumper, sizes" :total="info.total"
+      <ElCol :span="8">
+        <ElRow :gutter="24">
+          <ElCol :span="8">
+              <ElText :size="'small'" type="primary">在线：{{ connectInfo.wsConnected }}</ElText>
+          </ElCol>
+          <ElCol :span="8">
+            <ElText :size="'small'" type="primary">连接：{{ connectInfo.wgPeers }}</ElText>
+          </ElCol>
+          <ElCol :span="8">
+            <ElText :size="'small'" type="primary">房间：{{ connectInfo.rooms }}</ElText>
+          </ElCol>
+        </ElRow>
+      </ElCol>
+      <el-col :span="8">
+        <el-pagination :size="'small'" background layout="prev, pager, next, sizes" :total="info.total"
                        @current-change="pageChange" :current-page="curPage" :page-size="pageSize"
                        @size-change="sizeChange" :page-sizes="[10, 20, 50, 100]"
         ></el-pagination>
       </el-col>
     </el-row>
+    </div>
+    
 
   </el-footer>
 </template>
