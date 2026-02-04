@@ -1,4 +1,4 @@
-import { Services } from "./stores";
+import { MacAddress, Services } from "./stores";
 import { wsReq, wsResp, log } from './publicType'
 import { ElMessage } from "element-plus";
 import { v4 as uuid } from "uuid";
@@ -55,22 +55,20 @@ export class Connection {
                 return true;
             }
             const svr = Services().get(this.serverName);
-            if (svr == undefined) {
+            if (svr == undefined || !svr.token?.token) {
                 return false;
             }
-            this.conn = await Connection.createConn(`${svr.certify ? 'https://' : 'http://'}${svr.host}:${svr.port}/ws`);
+            this.conn = await Connection.createConn(
+                `${svr.certify ? 'https://' : 'http://'}${svr.host}:${svr.port}/ws?token=${encodeURIComponent(svr.token.token)}&mac=${MacAddress}`);
 
             this.conn.onmessage = this.handle.bind(this);
-            this.conn.onerror = (event) => {
-                // Logger.error("wsError:" + event.message)
-            }
             this.conn.onclose = () => {
                 log('info', 'connection closed');
-                if (onclose) onclose();
+                onclose?.();
             }
             return true;
         } catch (e) {
-            log('error', `create ws connection failed:${e.toString()}`)
+            log('error', `create ws connection failed.`);
             return false;
         } finally {
             release();
@@ -129,10 +127,6 @@ export class Connection {
     // 发送ws消息并添加单次回调函数
     public async send(msg: wsReq, handle?: wsHandleFunc): Promise<void> {
         if (this.conn === null || this.conn.readyState !== this.conn.OPEN) {
-            ElMessage({
-                type: 'warning',
-                message: '未建立ws连接',
-            })
             return;
         }
         this.conn.send(JSON.stringify(msg));

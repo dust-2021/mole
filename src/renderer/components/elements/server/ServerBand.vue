@@ -6,7 +6,7 @@ import {server, wsResp, getErrMsg} from "../../../utils/publicType";
 import {onBeforeMount, onBeforeUnmount, PropType, ref} from 'vue';
 import {ElMessage} from "element-plus";
 import {login} from '../../../utils/api/http/user'
-import {auth, ping as pingApi} from '../../../utils/api/ws/base'
+import {ping as pingApi} from '../../../utils/api/ws/base'
 import {Connection as wsConn} from "../../../utils/conn";
 import {Services} from '../../../utils/stores'
 import { wgInfo } from "../../../utils/api/http/server";
@@ -39,10 +39,13 @@ async function activeCon() {
     };
     conn.close();
     connected.value = 0;
-  } else {
+    return;
+  } 
     connected.value = 1;
     // 连接失败
-    if (!(await conn.active(()=> {
+    const flag = await conn.active(
+      // 关闭回调
+      ()=> {
       if(pingTaskId) clearInterval(pingTaskId);
       connected.value = 0;
       ElMessage({
@@ -51,29 +54,13 @@ async function activeCon() {
       if (router.currentRoute.value.name === "room") {
         router.go(-1);
       }
-    }))) {
-      connected.value = 0;
-      ElMessage({
-        type: 'error',
-        message: '连接服务器失败'
-      })
-      return;
-    }
-    
-    await auth(props.serverName,  (resp) => {
-      if (resp.statusCode !== 0) {
-        conn.close();
-        connected.value = 0;
-        ElMessage({
-          type: 'error',
-          message: getErrMsg(resp.statusCode),
-        })
-      } else {
-        pingTask();
-        connected.value = 2;
-      }
-    });
-  }
+    })
+    if (flag) pingTask();
+    connected.value = flag ? 2: 0;
+    ElMessage({
+      type: flag ? 'success': 'error',
+      message: `连接${props.serverName}${flag? '成功': '失败'}`
+    })
 }
 
 function pingCallback(resp: wsResp) {
