@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, watch} from 'vue'
+import {ref} from 'vue'
 import {Services} from "../../../utils/stores";
 import { ElButton, ElMain, ElMessage, ElTable, ElTableColumn } from 'element-plus';
 import { createUsers } from '../../../utils/api/http/user';
@@ -41,10 +41,14 @@ async function setPublicRegisterF(to: boolean) {
   if (!resp) {
     ElMessage({
       type: "error",
-      message: "设置公共注册失败"
+      message: "设置失败"
     })
     return;
   }
+  ElMessage({
+    type: "success",
+    message: "设置完成"
+  })
 }
 
 </script>

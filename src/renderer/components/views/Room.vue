@@ -90,7 +90,7 @@ onBeforeMount(async () => {
     ElMessage({
       type: "info", message: "打开房间失败"
     })
-    router.go(-1);
+    router.push(`/server/page/${props.serverName}`);
     return;
   };
   curRoom = room;
@@ -98,7 +98,7 @@ onBeforeMount(async () => {
     ElMessage({
       type: "info", message: "房间已关闭"
     })
-    router.go(-1);
+    router.push(`/server/page/${props.serverName}`);
   }
   mounted.value = true;
 })
