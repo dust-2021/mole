@@ -127,6 +127,7 @@ export class Connection {
     // 发送ws消息并添加单次回调函数
     public async send(msg: wsReq, handle?: wsHandleFunc): Promise<void> {
         if (this.conn === null || this.conn.readyState !== this.conn.OPEN) {
+            ElMessage({ type: "error", message: "连接未建立" });
             return;
         }
         this.conn.send(JSON.stringify(msg));

@@ -46,6 +46,27 @@ export function initialIPC(ipc: typeof ipcMain) {
     ipc.handle("wireguard", async (Event, type_: string, ...args: any[]) => {
         return await wgIpc(type_, ...args);
     });
+
+    // 选择本地文件夹用于导出
+    ipc.handle("select-folder", async (Event) => {
+        const { dialog } = require('electron');
+        const res = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+        if (res.canceled || !res.filePaths || res.filePaths.length === 0) return;
+        return res.filePaths[0];
+    });
+
+    // 保存文件到指定文件夹
+    ipc.handle("save-file", (Event, folder: string, filename: string, data: string, encoding = 'utf8') => {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const full = path.join(folder, filename);
+            fs.writeFileSync(full, data, { encoding });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    });
 }
 
 function getMacAddress(): string {

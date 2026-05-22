@@ -56,7 +56,7 @@ export async function fetch(serverName: string, method: string, url: string, wit
         const result = resp.data as HttpResp;
         log(result.code === 0 ? 'info' : 'error', `${serverName} | ${url} | ${method} | ${result.code === 0 ? 'success' : result.message}`);
         return resp.data;
-    } catch (e) {
+    } catch (e: any) {
         log('error', `request failed: ${method} | ${url}` + e.toString());
         return {
             code: -1, message: ''

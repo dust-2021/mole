@@ -239,7 +239,7 @@ getinRoom(roomId, pwd);
       <el-col :span="8">
         <el-pagination :size="'small'" background layout="prev, pager, next, sizes" :total="info.total"
                        @current-change="pageChange" :current-page="curPage" :page-size="pageSize"
-                       @size-change="sizeChange" :page-sizes="[10, 20, 50, 100]"
+                       @size-change="sizeChange" :page-sizes="[10, 20, 50]"
         ></el-pagination>
       </el-col>
     </el-row>

@@ -30,7 +30,7 @@ const FormatMessageA = win32.func('FormatMessageA', 'uint32', [
     CType.c_type.UNKNOWN_POINTER  // Arguments
 ]);
 
-function logger_callback(level: number, msg: string, code: number) {
+async function logger(level: number, msg: string, code: number) {
     let level_s = "info";
     switch (level) {
         case 1:
@@ -52,6 +52,10 @@ function logger_callback(level: number, msg: string, code: number) {
             msg += ", err info: " + iconv.decode(info.subarray(0, length), 'gbk').replace(/[\r\n]+$/, '');
     }
     Logger.log(level_s, " [dll] | " + msg);
+}
+
+function logger_callback(level: number, msg: string, code: number) {
+    logger(level, msg, code).then();
 }
 
 export const win_logger = koffi.register(logger_callback, koffi.pointer(CType.WireGuardLoggerCallback));

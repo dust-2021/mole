@@ -19,12 +19,12 @@ export async function logout(serverName: string): Promise<boolean> {
 
 }
 
-export async function createUsers(serverName: string, count: number): Promise<{ username: string, password: string }[]> {
+export async function createUsers(serverName: string, count: number): Promise<{code: number, data:{ username: string, password: string }[]}> {
     const resp = await fetch(serverName, "get", `sapi/system/user/createPieces?count=${count}`, true);
     if (resp.code !== 0) {
-        return [];
+        return {code: resp.code, data: []};
     }
-    return resp.data as { username: string, password: string }[];
+    return {code: 0, data: resp.data as { username: string, password: string }[]};
 }
 
 export async function registerUser(serverName: string, username: string, password: string, phone: string, email: string): Promise<number> {
@@ -36,4 +36,14 @@ export async function registerUser(serverName: string, username: string, passwor
     ]);
     const resp = await fetch(serverName, "post", "api/register", false, data);
     return resp.code;
+}
+
+export async function addBlacklist(serverName: string, uuid:string): Promise<boolean> {
+    const resp = await fetch(serverName, "get", `api/blacklist/add?uuid=${uuid}`, true);
+    return resp.code === 0;
+}
+
+export async function deleteBlacklist(serverName: string, uuid:string): Promise<boolean> {
+    const resp = await fetch(serverName, "get", `api/blacklist/delete?uuid=${uuid}`, true);
+    return resp.code === 0;
 }
