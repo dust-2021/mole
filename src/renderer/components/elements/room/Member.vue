@@ -26,7 +26,7 @@ onBeforeMount(async() => {
 <template>
 
  <ElScrollbar :always="false" v-if="mounted" style="height: 80%;">
-    <ElRow style="height: 60px;margin: 5px; border: 1px solid #eee; border-radius: 5px;" 
+    <ElRow style="height: 60px;margin: 5px; border: 1px solid #eee; border-radius: 5px;box-sizing: border-box;" 
         :gutter="24" v-for=" [k, v] of room.members.value" :key="k">
         <ElCol :span="16">
                 <div style="width: 100%;height: 32px;">

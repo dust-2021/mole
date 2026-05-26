@@ -85,6 +85,7 @@ export class Room {
     // 服务器wg信息
     private readonly host: string = "";
     private readonly port: number = 0;
+    private msgCallback: ((msg: message) => void) | null = null;
     public readonly vlanPrefix: string = "";
 
     public constructor(conn: Connection, id: string, svr: server, link: string) {
@@ -107,9 +108,21 @@ export class Room {
         }
     }
 
+    public async setMsgCallback(callback: (msg: message) => void) {
+        const r = await this.lock.acquireWrite();
+        try {
+            this.msgCallback = callback;
+        } finally {
+            r();
+        }
+    }
+
     private async addMsgLocked(msgs: message[]) {
         for (const msg of msgs) {
             this.messages.value.push(msg);
+            if (this.msgCallback) {
+                this.msgCallback(msg);
+            }
         }
         const k = this.messages.value.length;
         if (k >= 1000) {

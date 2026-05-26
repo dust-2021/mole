@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onBeforeMount, onBeforeUnmount, ref} from 'vue'
+import {onBeforeMount, onBeforeUnmount, onMounted, nextTick, ref} from 'vue'
 import {wsResp} from "../../utils/publicType";
 import {useRouter} from "vue-router";
 import {ElMessage, ElScrollbar} from "element-plus";
@@ -27,7 +27,37 @@ const mounted = ref(false);
 const inputMessage = ref<string>('');
 const router = useRouter();
 let curRoom: Room;
+const messageScroll = ref<any>(null);
+const showUnreadBubble = ref(false);
+const unreadCount = ref(0);
+const scrollBottom = ref(true);
+
 const test = ref(new Map<string, any>())
+
+function isScrollAtBottom(target: HTMLElement) {
+  return target.scrollHeight - target.scrollTop - target.clientHeight <= 40;
+}
+
+function onScroll({ scrollTop }: { scrollTop: number; scrollLeft: number }) {
+  const wrap = messageScroll.value?.wrapRef as HTMLElement | undefined;
+  if (!wrap) return;
+  const atBottom = wrap.scrollHeight - scrollTop - wrap.clientHeight <= 40;
+  scrollBottom.value = atBottom;
+  if (atBottom) {
+    showUnreadBubble.value = false;
+    unreadCount.value = 0;
+  }
+}
+
+async function scrollToBottom() {
+  await nextTick();
+  const wrap = messageScroll.value?.wrapRef as HTMLElement | undefined;
+  if (!wrap) return;
+  wrap.scrollTop = wrap.scrollHeight;
+  scrollBottom.value = true;
+  showUnreadBubble.value = false;
+  unreadCount.value = 0;
+}
 
 function copyLink(msg: string) {
   if (!(curRoom.members.value.get(curRoom.selfUuid))?.owner) {
@@ -46,7 +76,11 @@ function copyLink(msg: string) {
 }
 
 async function sendMessage(): Promise<void> {
-  if (inputMessage.value === "") {
+  if (inputMessage.value.replace(/\s+/g, "") === "") {
+    ElMessage({
+      type: 'warning',
+      message: '请输入消息'
+    })
     return;
   }
   await roomMessage(props.serverName, props.roomId, inputMessage.value, async (r) => {
@@ -99,9 +133,30 @@ onBeforeMount(async () => {
       type: "info", message: "房间已关闭"
     })
     router.push(`/server/page/${props.serverName}`);
-  }
+  };
+  await curRoom.setMsgCallback(async (msg) => {
+    await nextTick();
+    const wrap = messageScroll.value?.wrapRef as HTMLElement | undefined;
+    if (!wrap) return;
+    if (scrollBottom.value) {
+      wrap.scrollTop = wrap.scrollHeight;
+      showUnreadBubble.value = false;
+      unreadCount.value = 0;
+    } else {
+      unreadCount.value += 1;
+      showUnreadBubble.value = true;
+    }
+  });
   mounted.value = true;
 })
+
+onMounted(async () => {
+  await nextTick();
+  const wrap = messageScroll.value?.wrapRef as HTMLElement | undefined;
+  if (wrap) {
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+});
 
 onBeforeUnmount(async () => {
   await roomOut(props.serverName, props.roomId);
@@ -139,15 +194,18 @@ onBeforeUnmount(async () => {
         </div>
       </el-col>
       <el-col :span="18" style="height: 100%;">
-        <div style="height: 70%;display: flex; flex-direction: column">
-          <el-scrollbar :always="false" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 10px;padding: 5px; margin-top: 5px;">
-            <div v-for="(message, index) in curRoom.messages.value">
+        <div style="height: 70%;display: flex; flex-direction: column; position: relative;">
+          <el-scrollbar ref="messageScroll" :always="false" @scroll="onScroll" style="background-color: #eaeaea;height: 70%;flex: 1;border-radius: 10px;padding: 5px; margin-top: 5px;">
+            <div v-for="(message, index) in curRoom.messages.value" :key="index">
               <Message :msg="message.text" :time="message.timestamp" :self="message.fromUuid === curRoom.selfUuid"
                        :username="message.fromUsername" v-if="message.fromUuid !== ''"></Message>
               <SystemMessage :message="message.text" :time="message.timestamp" v-else></SystemMessage>
             </div>
-
           </el-scrollbar>
+          <div v-if="showUnreadBubble" class="unread-bubble" @click="scrollToBottom">
+            <span>{{ unreadCount }} 条新消息</span>
+            <span class="unread-bubble-arrow"></span>
+          </div>
         </div>
 
         <div style="height: 30%;padding-top: 10px">
@@ -190,5 +248,36 @@ onBeforeUnmount(async () => {
   display: flex;
   justify-items: center;
   align-items: center;
+}
+
+.unread-bubble {
+  position: absolute;
+  right: 20px;
+  bottom: 90px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: #1890ff;
+  color: #ffffff;
+  font-size: 13px;
+  border-radius: 20px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  user-select: none;
+}
+
+.unread-bubble:hover {
+  background: #096dd9;
+}
+
+.unread-bubble-arrow {
+  width: 0;
+  height: 0;
+  margin-left: 8px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #ffffff;
 }
 </style>
