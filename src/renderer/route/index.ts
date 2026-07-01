@@ -1,38 +1,36 @@
-import {createRouter, createWebHashHistory, RouteRecordRaw} from "vue-router";
-import ServerPage from "../components/views/ServerPage.vue";
-import ServerConfig from "../components/elements/server/ServerConfig.vue";
-import Room from "../components/views/Room.vue";
-import RoomCreator from "../components/elements/room/RoomCreator.vue";
-import Setting from "../components/elements/system/Setting.vue";
-import ServerItems from "../components/elements/server/ServerItems.vue";
+import { createRouter, createWebHashHistory, RouteRecordRaw } from "vue-router";
+import LoginView from "../components/LoginView.vue";
+import MainLayout from "../components/MainLayout.vue";
+import ServerHome from "../components/ServerHome.vue";
+import RoomsList from "../components/RoomsList.vue";
+import RoomView from "../components/RoomView.vue";
+import RoomCreate from "../components/RoomCreate.vue";
+import Settings from "../components/Settings.vue";
 
 const routes: RouteRecordRaw[] = [
     {
-        path: "/server",
+        path: "/",
+        name: "login",
+        component: LoginView,
+    },
+    {
+        path: "/main/:serverName",
+        component: MainLayout,
+        props: true,
         children: [
-            {path: '', components: {middle: ServerItems}},
-            {path: 'add', components: {default: ServerConfig, middle: ServerItems}, props: true},
-            {path: 'page/:serverName', components: {default: ServerPage, middle: ServerItems}, props: true},
-            {
-                path: "room",
-                children: [
-                    {path: 'page/:serverName/:roomId', components: {default: Room, middle: ServerItems}, props: true, name: "room"},
-                    {path: 'create/:serverName', components: {default: RoomCreator, middle: ServerItems}, props: true},
-                ]
-            }
+            { path: "", redirect: (to) => `/main/${to.params.serverName}/home` },
+            { path: "home", component: ServerHome, props: true },
+            { path: "rooms", component: RoomsList, props: true },
+            { path: "settings", component: Settings, props: true },
+            { path: "room/create", component: RoomCreate, props: true },
+            { path: "room/:roomId", component: RoomView, props: true, name: "room" },
         ],
     },
-    {
-        path: "/test",
-        children: []
-    },
-    {
-        path: "/setting",
-        component: Setting,
-    }
 ];
+
 const router = createRouter({
     history: createWebHashHistory(),
-    routes
-})
+    routes,
+});
+
 export default router;

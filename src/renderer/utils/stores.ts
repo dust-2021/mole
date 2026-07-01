@@ -29,21 +29,18 @@ export const Services =  defineStore('Services', {
             set(key: string, value: server) {
                 this.originData.set(key, value);
             },
-            pop(key: string): server {
-                let svr: server = this.originData.get(key);
+            pop(key: string): server | undefined {
+                const svr = this.originData.get(key);
                 this.originData.delete(key);
                 return svr;
             },
             // 直接读取文件数据
-            load(): void {
-                window['electron'].invoke("loadLocal", 'Services').then((data: string) => {
+            load(): Promise<void> {
+                return window['electron'].invoke("loadLocal", 'Services').then((data: string) => {
                     if (data === '' || data === undefined) {
                         return
                     }
                     const elements: [key: string, value: server][] = JSON.parse(data);
-                    for (const key in elements) {
-                        this.originData.set(key, elements[key]);
-                    }
                     this.originData = new Map<string, server>(elements);
                 });
             },
@@ -56,12 +53,12 @@ export const Services =  defineStore('Services', {
 // 设备mac地址
 export let MacAddress: string = '';
 
-export function initStore() {
+export function initStore(): Promise<void> {
     const svr = Services();
-    svr.load();
     window['electron'].invoke('macAddress').then((address: string) => {
         MacAddress = address;
     })
+    return svr.load();
 }
 
 export function saveStore() {

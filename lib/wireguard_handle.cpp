@@ -60,6 +60,9 @@ class room_config
 
 public:
     std::wstring name;
+    // 绑定的 IP 和网段（用于删除时清理）
+    std::string adapter_ip;
+    std::string adapter_ip_area;
     // wireguard 适配器配置
     WIREGUARD_INTERFACE interface_config{};
     // wireguard 适配器对等体配置
@@ -177,11 +180,14 @@ public:
         }
         auto handle = WireGuardCreateAdapter(name, L"WireGuard Tunnel", nullptr);
         if (handle == nullptr)
-        {
+        {   
+            log(WIREGUARD_LOG_ERR, "adapter create failed", GetLastError());
             return false;
         }
         // 创建配置并设置适配器
         auto conf = std::make_unique<room_config>(handle, name, public_key, private_key, listen_port);
+        conf->adapter_ip = adapter_ip;
+        conf->adapter_ip_area = ip_area;
         if (!conf->set_config() || !bind_adapter(handle, adapter_ip, ip_area))
         {
             WireGuardCloseAdapter(handle);
@@ -201,7 +207,16 @@ public:
         {
             return;
         }
-        WireGuardCloseAdapter(rooms[name]->handle);
+        auto &room = rooms[name];
+        // 清理虚拟网卡 IP 和路由
+        unbind_adapter(room->handle, room->adapter_ip.c_str(), room->adapter_ip_area.c_str());
+        // 清空 peers 配置
+        room->peers.clear();
+        room->peer_allowed_ips.clear();
+        room->interface_config.PeersCount = 0;
+        room->interface_config.Flags = room_config::BASE_FLAG | WIREGUARD_INTERFACE_REPLACE_PEERS;
+        room->set_config();
+        WireGuardCloseAdapter(room->handle);
         log_dll(WIREGUARD_LOG_INFO, 0, std::wstring(L"adapter deleted of room:").append(name).c_str());
         rooms.erase(name);
     }

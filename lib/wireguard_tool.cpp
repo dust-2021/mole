@@ -245,6 +245,33 @@ bool bind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char *i
     return true;
 }
 
+// 清理虚拟网卡 IP 和路由
+void unbind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char *ip_area)
+{
+    NET_LUID luid;
+    WireGuardGetAdapterLUID(handle, &luid);
+    DWORD interface_index;
+    ConvertInterfaceLuidToIndex(&luid, &interface_index);
+
+    // 删除 IP 地址
+    MIB_UNICASTIPADDRESS_ROW ipRow;
+    InitializeUnicastIpAddressEntry(&ipRow);
+    ipRow.InterfaceIndex = interface_index;
+    ipRow.Address.si_family = AF_INET;
+    inet_pton(AF_INET, ip, &ipRow.Address.Ipv4.sin_addr);
+    DeleteUnicastIpAddressEntry(&ipRow);
+
+    // 删除路由
+    MIB_IPFORWARD_ROW2 route;
+    InitializeIpForwardEntry(&route);
+    route.InterfaceLuid = luid;
+    route.InterfaceIndex = interface_index;
+    route.DestinationPrefix.Prefix.si_family = AF_INET;
+    inet_pton(AF_INET, ip_area, &route.DestinationPrefix.Prefix.Ipv4.sin_addr);
+    route.DestinationPrefix.PrefixLength = MASK;
+    DeleteIpForwardEntry2(&route);
+}
+
 namespace formmater
 {
     // byte密钥转b64字符串

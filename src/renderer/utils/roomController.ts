@@ -1,7 +1,7 @@
 import { RWLock } from '../../shared/asynchronous';
 import { Connection } from './conn';
 import { wsResp, wireguardFunc, server, udpFunc, log } from './publicType';
-import { ref, Ref } from 'vue';
+import { ref, Ref, shallowRef, triggerRef } from 'vue';
 import { Services } from './stores';
 
 class RoomController {
@@ -72,12 +72,12 @@ export class Room {
     private lock: RWLock = new RWLock();
     public readonly conn: Connection;
     public readonly roomId: string;
-    public readonly link: string;
+    public link: string;
     public readonly selfUuid: string;
 
     // vue组件可访问的响应式数据
     public forbidden: Ref<boolean> = ref(true);
-    public members: Ref<Map<string, member>> = ref(new Map<string, member>());
+    public members: Ref<Map<string, member>> = shallowRef(new Map<string, member>());
     public messages: Ref<message[]> = ref([]);
 
     public onClose: (() => void) | null = null;
@@ -134,6 +134,7 @@ export class Room {
     private async modifyConnFlagLocked(uid: string, to: 0 | 1 | 2) {
         if (!this.members.value.has(uid)) return;
         this.members.value.get(uid)!.directFlag = to;
+        triggerRef(this.members);
     }
 
     // 检查wg直连，失败后回退
@@ -160,6 +161,7 @@ export class Room {
         // 禁止重复添加，防止ws和wg管理混乱
         if (this.members.value.has(m.uuid)) return;
         this.members.value.set(m.uuid, m);
+        triggerRef(this.members);
         if (m.uuid === this.selfUuid) return;
         // 具有真实公网地址进行直连尝试，失败退回转发模式
         const vlan = this.vlanPrefix + `.${m.vlan >> 8}.${m.vlan & 0xff}`;
@@ -185,13 +187,14 @@ export class Room {
         }
     }
 
-    public async delMember(userUUid: string) {
+    public async delMember(userUUid: string, force: boolean = false) {
         const r = await this.lock.acquireWrite();
         try {
             const mem = this.members.value.get(userUUid);
             if (!mem) return;
-            this.addMsgLocked([{ fromUuid: "", text: `${mem.name}离开房间`, timestamp: Date.now(), fromUsername: "" }]);
+            this.addMsgLocked([{ fromUuid: "", text: force ? `{${mem.name}被踢出房间}`: `${mem.name}离开房间`, timestamp: Date.now(), fromUsername: "" }]);
             this.members.value.delete(userUUid);
+            triggerRef(this.members);
             // if (!await wireguardFunc.pauseAdapter(this.roomId)) return;
             await wireguardFunc.delPeer(this.roomId, userUUid);
             await wireguardFunc.delTransIps([`${this.vlanPrefix}.${mem.vlan >> 8}.${mem.vlan & 0xff}`]);
@@ -209,6 +212,7 @@ export class Room {
                 newMem.owner = true;
                 this.addMsgLocked([{ fromUuid: "", text: `房主移交至${newMem.name}`, timestamp: Date.now(), fromUsername: "" }])
             }
+            triggerRef(this.members);
         } catch (error) { } finally { r() }
     }
 
@@ -258,7 +262,6 @@ async function handle(t: string, r: wsResp) {
         room = await roomer.getRoom(r.id);
         if (!room) return;
     };
-    log('debug', `Received ${t} message in room ${r.id}: ${JSON.stringify(r.data)}`);
     switch (t) {
         case "in":
             const data_in: member = r.data;
@@ -267,12 +270,19 @@ async function handle(t: string, r: wsResp) {
         case "out":
             await room.delMember(r.data as string);
             break;
+        case "kick":
+            const kickedUuid = r.data as string;
+            await room.delMember(kickedUuid, true);
+            if (kickedUuid === room.selfUuid && room.onClose) {
+                room.onClose();
+            }
+            break;
         case "exchangeOwner":
             const data_ex: { old: string, new: string } = r.data;
             await room.changeOwner(data_ex.old, data_ex.new);
             break;
         case "forbidden":
-            room.changeForbidden(r.data as boolean);
+            await room.changeForbidden(r.data as boolean);
             break;
         case "close":
             if (room.onClose) room.onClose();
@@ -289,6 +299,7 @@ async function handle(t: string, r: wsResp) {
 
 Connection.publicHandleByMethod.set("publish.room.notice.in", (r: wsResp) => handle("in", r));
 Connection.publicHandleByMethod.set("publish.room.notice.out", (r: wsResp) => handle("out", r));
+Connection.publicHandleByMethod.set("publish.room.notice.kick", (r: wsResp) => handle("kick", r));
 Connection.publicHandleByMethod.set("publish.room.notice.exchangeOwner", (r: wsResp) => handle("exchangeOwner", r));
 Connection.publicHandleByMethod.set("publish.room.notice.forbidden", (r: wsResp) => handle("forbidden", r));
 Connection.publicHandleByMethod.set("publish.room.notice.close", (r: wsResp) => handle("close", r));

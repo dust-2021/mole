@@ -110,17 +110,15 @@ export class Connection {
             } else if (await Connection.publicHandleByMethod.has(r.method)) {
                 f = await Connection.publicHandleByMethod.get(r.method);
             };
-            if (await this.handleById.has(r.id)) {
-                f = await this.handleById.get(r.id);
-            }
+            // 用 pop 原子获取并删除，避免 has+get 之间的竞态
+            const idHandler = await this.handleById.pop(r.id);
+            if (idHandler) f = idHandler;
             const result = f?.(r);
             if (result instanceof Promise) {
                 await result;
             }
         } catch (e) {
             console.error(e);
-        } finally {
-            await this.handleById.delete(r.id);
         }
     }
 
@@ -130,10 +128,11 @@ export class Connection {
             ElMessage({ type: "error", message: "连接未建立" });
             return;
         }
-        this.conn.send(JSON.stringify(msg));
+        // 先注册回调，再发送消息，防止服务器快速响应时回调丢失
         if (handle) {
             await this.handleById.set(msg.id, handle);
         }
+        this.conn.send(JSON.stringify(msg));
     }
 
     // 添加ws处理函数

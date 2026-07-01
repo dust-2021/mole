@@ -13,8 +13,10 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 app.use(router);
 app.use(createPinia());
-app.mount('#app');
-initStore();
+
+initStore().then(() => {
+    app.mount('#app');
+});
 
 app.onUnmount(() => {
     saveStore();
