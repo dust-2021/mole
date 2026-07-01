@@ -11,7 +11,7 @@ export async function roomOut(server: string, roomId: string, handle?: wsHandleF
     await wsRequest(server, 'room.out', [roomId], handle);
 }
 
-export async function kickMember(server: string, roomId: string, userId: number, handle?: wsHandleFunc) {
+export async function kickMember(server: string, roomId: string, userId: string, handle?: wsHandleFunc) {
 	await wsRequest(server, 'room.kick', [roomId, userId], handle);
 }
 

@@ -44,6 +44,17 @@ class RoomController {
             await wireguardFunc.delRoom(id);
         } catch (error) { } finally { r() };
     }
+
+    // 清理所有房间（连接断开时调用）
+    public async clear() {
+        const r = await this.lock.acquireWrite();
+        try {
+            for (const [id, _] of this.AllRoom) {
+                await wireguardFunc.delRoom(id);
+            }
+            this.AllRoom.clear();
+        } catch (error) { } finally { r() };
+    }
 }
 
 export interface member {
@@ -192,7 +203,7 @@ export class Room {
         try {
             const mem = this.members.value.get(userUUid);
             if (!mem) return;
-            this.addMsgLocked([{ fromUuid: "", text: force ? `{${mem.name}被踢出房间}`: `${mem.name}离开房间`, timestamp: Date.now(), fromUsername: "" }]);
+            this.addMsgLocked([{ fromUuid: "", text: force ? `${mem.name}被踢出房间`: `${mem.name}离开房间`, timestamp: Date.now(), fromUsername: "" }]);
             this.members.value.delete(userUUid);
             triggerRef(this.members);
             // if (!await wireguardFunc.pauseAdapter(this.roomId)) return;

@@ -30,11 +30,9 @@
             class="member-item"
           >
             <el-popover
-              :visible="popoverTarget === m.uuid"
               placement="right"
               :width="140"
               trigger="click"
-              @hide="popoverTarget = ''"
             >
               <template #reference>
                 <div
@@ -44,14 +42,13 @@
                     'direct-ok': m.directFlag === 1,
                     'direct-fail': m.directFlag === 2,
                   }"
-                  @click.stop="popoverTarget = m.uuid"
                 >{{ m.name.charAt(0).toUpperCase() }}</div>
               </template>
               <div class="member-menu">
                 <div
                   v-if="isOwner && m.uuid !== curRoom.selfUuid"
                   class="menu-item"
-                  @click="kickMemberAction(m); popoverTarget = ''"
+                  @click="kickMemberAction(m)"
                 >
                   <el-icon><Remove /></el-icon>
                   <span>踢出房间</span>
@@ -59,7 +56,7 @@
                 <div
                   v-if="m.uuid !== curRoom.selfUuid"
                   class="menu-item"
-                  @click="addBlacklistAction(m); popoverTarget = ''"
+                  @click="addBlacklistAction(m)"
                 >
                   <el-icon><CircleClose /></el-icon>
                   <span>加入黑名单</span>
@@ -144,7 +141,6 @@ const showUnread = ref(false)
 const unreadCount = ref(0)
 const scrollBottom = ref(true)
 const toggling = ref(false)
-const popoverTarget = ref('')
 
 // 和原组件一致：用普通变量保存 Room 实例，避免 ref 嵌套解包问题
 let curRoom: Room
@@ -162,7 +158,7 @@ const isOwner = computed(() => {
 
 function formatTime(ts: number): string {
   const d = new Date(ts)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
 
 function onScroll() {
@@ -240,7 +236,7 @@ function copyLink() {
 // 踢出成员
 function kickMemberAction(m: member) {
   if (!curRoom || !isOwner.value) return
-  kickMember(props.serverName, props.roomId, m.id, (r: wsResp) => {
+  kickMember(props.serverName, props.roomId, m.uuid, (r: wsResp) => {
     if (r.statusCode !== 0) {
       ElMessage.error('踢出失败: ' + r.data)
     } else {

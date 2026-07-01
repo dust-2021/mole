@@ -233,6 +233,7 @@ import { server, user as UserType, ipcSend, getErrMsg } from '../utils/publicTyp
 import { login, registerUser } from '../utils/api/http/user'
 import { wgInfo } from '../utils/api/http/server'
 import { Connection } from '../utils/conn'
+import { roomer } from '../utils/roomController'
 
 const router = useRouter()
 const svrStore = Services()
@@ -481,7 +482,12 @@ async function loginWithUser(user: UserType) {
 
     // 尝试建立 WebSocket 连接
     const conn = Connection.getInstance(selectedServer.value)
-    const connected = await conn.active()
+    const connected = await conn.active(() => {
+      // 连接断开时清理所有房间
+      roomer.clear()
+      ElMessage.warning('与服务器连接已断开')
+      router.push('/')
+    })
     if (!connected) {
       ElMessage.error('连接服务器失败，请检查网络或服务器状态')
       return
