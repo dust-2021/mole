@@ -15,8 +15,8 @@ function udpPayload(type: UdpMsgType, uuid: string, data: string): string {
 }
 
 /**
- * NAT穿透类
- * 负责nat打洞，打洞完成后释放端口，由wireguard适配器占用端口进行通信
+ * 用于wireguard直连确认
+ * 
  */
 class UdpHandler {
 

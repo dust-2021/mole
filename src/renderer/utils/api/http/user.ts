@@ -38,12 +38,12 @@ export async function registerUser(serverName: string, username: string, passwor
     return resp.code;
 }
 
-export async function addBlacklist(serverName: string, uuid:string): Promise<boolean> {
-    const resp = await fetch(serverName, "get", `api/blacklist/add?uuid=${uuid}`, true);
+export async function addBlacklist(serverName: string, type: "uuid" | "ip" | "device", id:string): Promise<boolean> {
+    const resp = await fetch(serverName, "get", `api/blacklist/add?id=${id}`, true);
     return resp.code === 0;
 }
 
-export async function deleteBlacklist(serverName: string, uuid:string): Promise<boolean> {
-    const resp = await fetch(serverName, "get", `api/blacklist/delete?uuid=${uuid}`, true);
+export async function deleteBlacklist(serverName: string, type: "uuid" | "ip" | "device", id:string): Promise<boolean> {
+    const resp = await fetch(serverName, "get", `api/blacklist/delete?id=${id}`, true);
     return resp.code === 0;
 }

@@ -247,8 +247,7 @@ function kickMemberAction(m: member) {
 
 // 加入黑名单（占位）
 function addBlacklistAction(m: member) {
-  ElMessage.info('黑名单功能待实现')
-  // TODO: await addBlacklist(props.serverName, m.uuid)
+  addBlacklist(props.serverName, 'uuid', m.uuid).then()
 }
 
 // 退出房间（通知 MainLayout 清理）

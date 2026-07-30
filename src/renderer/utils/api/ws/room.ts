@@ -73,7 +73,7 @@ export async function roomMates(server: string, roomId: string, handle?: wsHandl
  */
 export async function roomCreate(server: string, conf: {
                                      title: string, description: string, maxMember: number,
-                                     ipBlackList: string[], userIdBlackList: number[], deviceBlackList: string[], autoClose: boolean
+                                     ipBlackList: boolean, userIdBlackList: boolean, deviceBlackList: boolean, autoClose: boolean
                                  },
                                  handle?: wsHandleFunc) {
     await wsRequest(server, 'room.create', [conf, await wireguardFunc.getPublicKey(), await getConfig("udpPort")], handle);

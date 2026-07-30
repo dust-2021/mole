@@ -5,7 +5,7 @@
     </div>
 
     <div class="form-card">
-      <el-form :model="form" label-width="100px" label-position="left" style="max-width: 480px;">
+      <el-form :model="form" label-width="100px" label-position="left" style="max-width: 600px;">
         <el-form-item label="房间标题" required>
           <el-input v-model="form.title" :maxlength="12" placeholder="输入房间标题" />
         </el-form-item>
@@ -23,7 +23,23 @@
         </el-form-item>
         <el-form-item label="自动关闭">
           <el-switch v-model="form.autoClose" />
-          <span style="margin-left: 8px; font-size: 12px; color: var(--text-secondary);">房间长时间无消息时自动关闭</span>
+          <span class="form-hint">房间长时间无消息时自动关闭</span>
+        </el-form-item>
+        <el-form-item label="黑名单">
+          <div class="blacklist-row">
+            <div class="blacklist-item">
+              <el-switch v-model="form.ipBlackList" size="small" />
+              <span>IP 黑名单</span>
+            </div>
+            <div class="blacklist-item">
+              <el-switch v-model="form.userIdBlackList" size="small" />
+              <span>用户黑名单</span>
+            </div>
+            <div class="blacklist-item">
+              <el-switch v-model="form.deviceBlackList" size="small" />
+              <span>设备黑名单</span>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="submit" :loading="submitting" :disabled="!form.title">
@@ -57,17 +73,17 @@ const form = ref<{
   maxMember: number
   password?: string
   autoClose: boolean
-  ipBlackList: string[]
-  userIdBlackList: number[]
-  deviceBlackList: string[]
+  ipBlackList: boolean
+  userIdBlackList: boolean
+  deviceBlackList: boolean
 }>({
   title: '',
   description: '',
   maxMember: 16,
   autoClose: false,
-  ipBlackList: [],
-  userIdBlackList: [],
-  deviceBlackList: [],
+  ipBlackList: false,
+  userIdBlackList: false,
+  deviceBlackList: false,
 })
 
 watch(withPassword, (val) => {
@@ -120,10 +136,15 @@ async function submit() {
 
 <style scoped>
 .room-create {
-  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .page-header {
+  width: 100%;
   margin-bottom: 24px;
 }
 
@@ -133,9 +154,28 @@ async function submit() {
 }
 
 .form-card {
+  width: 100%;
   background: var(--bg-primary);
   border-radius: var(--radius-base);
-  padding: 24px;
+  padding: 32px 40px;
   box-shadow: var(--shadow-light);
+}
+
+.form-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.blacklist-row {
+  display: flex;
+  gap: 24px;
+}
+
+.blacklist-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
 }
 </style>
