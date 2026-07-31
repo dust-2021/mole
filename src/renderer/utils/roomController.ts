@@ -6,54 +6,41 @@ import { Services } from './stores';
 
 class RoomController {
     private AllRoom: Map<string, Room> = new Map();
-    private lock: RWLock = new RWLock();
 
     // 创建房间时，必须已获取vlanIP，创建房间自动添加中继服务器
     public async createRoom(conn: Connection, id: string, svr: string, vlan: number, link: string): Promise<Room | null> {
         const s = Services().get(svr);
         if (!s || !s.wgInfo) return null;
-        const r = await this.lock.acquireWrite();
-        try {
-            if (!await wireguardFunc.createRoom(id,
-                `${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.${vlan >> 8}.${vlan & 0xff}`,
-                `${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.0`) ||
-                // 添加中继服务器peer
-                !await wireguardFunc.addPeer(id, s.wgInfo.publicKey, s.host, s.wgInfo.listenPort, s.wgInfo.publicKey,
-                    [`${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.1/16`], 1) ||
-                !await wireguardFunc.runAdapter(id)) {
-                await wireguardFunc.delRoom(id);
-                return null;
-            };
-            const room = new Room(conn, id, s, link);
-            this.AllRoom.set(id, room);
-            return room;
-        } catch (error) { return null; } finally { r(); }
+        if (!await wireguardFunc.createRoom(id,
+            `${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.${vlan >> 8}.${vlan & 0xff}`,
+            `${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.0`) ||
+            // 添加中继服务器peer
+            !await wireguardFunc.addPeer(id, s.wgInfo.publicKey, s.host, s.wgInfo.listenPort, s.wgInfo.publicKey,
+                [`${s.wgInfo.vlanIp[0]}.${s.wgInfo.vlanIp[1]}.0.1/16`], 1) ||
+            !await wireguardFunc.runAdapter(id)) {
+            await wireguardFunc.delRoom(id);
+            return null;
+        };
+        const room = new Room(conn, id, s, link);
+        this.AllRoom.set(id, room);
+        return room;
     }
 
     public async getRoom(id: string): Promise<Room | undefined> {
-        const r = await this.lock.acquireRead();
-        try {
-            return this.AllRoom.get(id)
-        } catch (error) { } finally { r() };
+        return this.AllRoom.get(id)
     }
 
     public async deleteRoom(id: string) {
-        const r = await this.lock.acquireWrite();
-        try {
-            this.AllRoom.delete(id);
-            await wireguardFunc.delRoom(id);
-        } catch (error) { } finally { r() };
+        this.AllRoom.delete(id);
+        await wireguardFunc.delRoom(id);
     }
 
     // 清理所有房间（连接断开时调用）
     public async clear() {
-        const r = await this.lock.acquireWrite();
-        try {
-            for (const [id, _] of this.AllRoom) {
-                await wireguardFunc.delRoom(id);
-            }
-            this.AllRoom.clear();
-        } catch (error) { } finally { r() };
+        for (const [id, _] of this.AllRoom) {
+            await wireguardFunc.delRoom(id);
+        }
+        this.AllRoom.clear();
     }
 }
 
@@ -68,7 +55,7 @@ export interface member {
     wgIp: string,
     wgPort: number,
     // undifined: 非直连, 0: 直连中, 1: 已直连, 2: 直连失败
-    directFlag?: 0 | 1 | 2 
+    directFlag?: 0 | 1 | 2
 }
 
 interface message {
@@ -111,24 +98,14 @@ export class Room {
     }
 
     public async addMsg(msgs: message[]) {
-        const r = await this.lock.acquireWrite();
-        try {
-            this.addMsgLocked(msgs);
-        } finally {
-            r();
-        }
+        this.checkInMsg(msgs);
     }
 
     public async setMsgCallback(callback: (msg: message) => void) {
-        const r = await this.lock.acquireWrite();
-        try {
-            this.msgCallback = callback;
-        } finally {
-            r();
-        }
+        this.msgCallback = callback;
     }
 
-    private async addMsgLocked(msgs: message[]) {
+    private async checkInMsg(msgs: message[]) {
         for (const msg of msgs) {
             this.messages.value.push(msg);
             if (this.msgCallback) {
@@ -152,23 +129,21 @@ export class Room {
     private async checkDirectConn(uuid: string, name: string, ip: string, port: number, timeout_s: number) {
         // wg直连后立刻进行udp连接尝试
         await udpFunc.connect(ip, port, timeout_s, async (f: boolean) => {
-            const r = await this.lock.acquireWrite();
-            try {
-                if(!this.members.value.has(uuid)) return;
-                await this.modifyConnFlagLocked(uuid, f ? 1 : 2);
-                await this.addMsgLocked([{ fromUuid: "", text: f ? `直连'${name}'成功` : `直连'${name}'失败`, timestamp: Date.now(), fromUsername: "" }]);
-                // 直连失败，回退为中转
-                if (!f) {
-                    this.members.value.get(uuid)!.wgIp = "";
-                    this.members.value.get(uuid)!.wgPort = 0;
-                    // await wireguardFunc.updatePeerEndpoint(this.roomId, uuid, this.host, this.port);
-                    await wireguardFunc.delPeer(this.roomId, uuid);
-                }
-            } finally { r(); }
+
+            if (!this.members.value.has(uuid)) return;
+            await this.modifyConnFlagLocked(uuid, f ? 1 : 2);
+            await this.checkInMsg([{ fromUuid: "", text: f ? `直连'${name}'成功` : `直连'${name}'失败`, timestamp: Date.now(), fromUsername: "" }]);
+            // 直连失败，回退为中转
+            if (!f) {
+                this.members.value.get(uuid)!.wgIp = "";
+                this.members.value.get(uuid)!.wgPort = 0;
+                // await wireguardFunc.updatePeerEndpoint(this.roomId, uuid, this.host, this.port);
+                await wireguardFunc.delPeer(this.roomId, uuid);
+            }
         });
     }
 
-    private async addMemberLocked(m: member) {
+    private async addMember(m: member) {
         // 禁止重复添加，防止ws和wg管理混乱
         if (this.members.value.has(m.uuid)) return;
         this.members.value.set(m.uuid, m);
@@ -183,57 +158,43 @@ export class Room {
                 [vlan], 1);
             await this.checkDirectConn(m.uuid, m.name, vlan, m.udpPort, 10);
         };
-        this.addMsgLocked([{ fromUuid: "", text: `${m.name}加入房间`, timestamp: Date.now(), fromUsername: "" }]);
+        this.checkInMsg([{ fromUuid: "", text: `${m.name}加入房间`, timestamp: Date.now(), fromUsername: "" }]);
     }
 
     public async addMembers(m: member[]) {
         if (m.length === 0) return;
-        const r = await this.lock.acquireWrite();
-        try {
-            for (const mem of m) {
-                await this.addMemberLocked(mem);
-            }
-        } catch (error) { } finally {
-            r();
+        for (const mem of m) {
+            await this.addMember(mem);
         }
     }
 
     public async delMember(userUUid: string, force: boolean = false) {
-        const r = await this.lock.acquireWrite();
-        try {
-            const mem = this.members.value.get(userUUid);
-            if (!mem) return;
-            this.addMsgLocked([{ fromUuid: "", text: force ? `${mem.name}被踢出房间`: `${mem.name}离开房间`, timestamp: Date.now(), fromUsername: "" }]);
-            this.members.value.delete(userUUid);
-            triggerRef(this.members);
-            // if (!await wireguardFunc.pauseAdapter(this.roomId)) return;
-            await wireguardFunc.delPeer(this.roomId, userUUid);
-            await wireguardFunc.delTransIps([`${this.vlanPrefix}.${mem.vlan >> 8}.${mem.vlan & 0xff}`]);
-            // await wireguardFunc.runAdapter(this.roomId);
-        } catch (error) { } finally { r() }
+        const mem = this.members.value.get(userUUid);
+        if (!mem) return;
+        this.checkInMsg([{ fromUuid: "", text: force ? `${mem.name}被踢出房间` : `${mem.name}离开房间`, timestamp: Date.now(), fromUsername: "" }]);
+        this.members.value.delete(userUUid);
+        triggerRef(this.members);
+        // if (!await wireguardFunc.pauseAdapter(this.roomId)) return;
+        await wireguardFunc.delPeer(this.roomId, userUUid);
+        await wireguardFunc.delTransIps([`${this.vlanPrefix}.${mem.vlan >> 8}.${mem.vlan & 0xff}`]);
+        // await wireguardFunc.runAdapter(this.roomId);
     }
 
     public async changeOwner(oldUuid: string, newUuid: string) {
-        const r = await this.lock.acquireWrite();
-        try {
-            const oldMem = this.members.value.get(oldUuid);
-            if (oldMem) oldMem.owner = false;
-            const newMem = this.members.value.get(newUuid);
-            if (newMem) {
-                newMem.owner = true;
-                this.addMsgLocked([{ fromUuid: "", text: `房主移交至${newMem.name}`, timestamp: Date.now(), fromUsername: "" }])
-            }
-            triggerRef(this.members);
-        } catch (error) { } finally { r() }
+        const oldMem = this.members.value.get(oldUuid);
+        if (oldMem) oldMem.owner = false;
+        const newMem = this.members.value.get(newUuid);
+        if (newMem) {
+            newMem.owner = true;
+            this.checkInMsg([{ fromUuid: "", text: `房主移交至${newMem.name}`, timestamp: Date.now(), fromUsername: "" }])
+        }
+        triggerRef(this.members);
     }
 
     public async changeForbidden(to: boolean) {
-        const r = await this.lock.acquireWrite();
-        try {
-            if (this.forbidden.value === to) return;
-            this.forbidden.value = to;
-            this.addMsgLocked([{ fromUuid: "", fromUsername: "", text: to ? "房间关闭进入" : "房间开启进入", timestamp: Date.now() }])
-        } catch (error) { } finally { r() };
+        if (this.forbidden.value === to) return;
+        this.forbidden.value = to;
+        this.checkInMsg([{ fromUuid: "", fromUsername: "", text: to ? "房间关闭进入" : "房间开启进入", timestamp: Date.now() }])
     }
 
     /**
@@ -244,22 +205,16 @@ export class Room {
      * @returns 
      */
     public async updateEndpoint(peer_uuid: string, ip: string, port: number) {
-        const r = await this.lock.acquireWrite();
-        try {
-            let peer = this.members.value.get(peer_uuid);
-            if (!peer) return;
-            peer.wgIp = ip;
-            peer.wgPort = port;
-            await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
-            await this.checkDirectConn(peer_uuid, peer.name, this.vlanPrefix + `.${peer.vlan >> 8}.${peer.vlan & 0xff}`, peer.udpPort, 10);
-        } catch (error) { } finally { r() }
+        let peer = this.members.value.get(peer_uuid);
+        if (!peer) return;
+        peer.wgIp = ip;
+        peer.wgPort = port;
+        await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
+        await this.checkDirectConn(peer_uuid, peer.name, this.vlanPrefix + `.${peer.vlan >> 8}.${peer.vlan & 0xff}`, peer.udpPort, 10);
     }
 
     public async printWg() {
-        const r = await this.lock.acquireWrite();
-        try{
-            this.addMsgLocked([{fromUuid: this.selfUuid, fromUsername: "", text: await wireguardFunc.getAdapterConfig(this.roomId), timestamp: Date.now()}]);
-        } finally {r()};
+        this.checkInMsg([{ fromUuid: this.selfUuid, fromUsername: "", text: await wireguardFunc.getAdapterConfig(this.roomId), timestamp: Date.now() }]);
     }
 }
 
