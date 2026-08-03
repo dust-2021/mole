@@ -49,10 +49,10 @@ export interface member {
     uuid: string,
     name: string,
     owner: boolean,
-    vlan: number,
+    vlan: number, // vlan ip的后两段
     publicKey: string,
     udpPort: number,
-    wgIp: string,
+    wgIp: string, // 连接成功后，获取到的真实公网地址
     wgPort: number,
     // undifined: 非直连, 0: 直连中, 1: 已直连, 2: 直连失败
     directFlag?: 0 | 1 | 2

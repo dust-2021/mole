@@ -65,7 +65,7 @@
             </el-popover>
             <div class="member-info">
               <span class="member-name">{{ m.name }}</span>
-              <span class="member-ip">{{ m.wgIp }}</span>
+              <span class="member-ip">{{ `${curRoom.vlanPrefix}.${m.vlan >> 8}.${m.vlan & 0xff}` }}</span>
             </div>
             <el-tag v-if="m.owner" size="small" type="warning">房主</el-tag>
             <el-tag v-else-if="m.uuid === curRoom.selfUuid" size="small" type="info">我</el-tag>
