@@ -31,3 +31,14 @@ export async function unsubscribe(server: string, channel: string) {
         }
     });
 }
+
+export async function broadcast(server: string, channel: string, msg: string) {
+    await wsRequest(server, 'channel.broadcast', [channel, msg], (r: wsResp) =>{
+        if (r.statusCode !== 0) {
+            ElMessage({
+                type: 'error',
+                message: `广播消息到频道：${channel}失败：${r.data}`
+            })
+        }
+    });
+}

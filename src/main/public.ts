@@ -83,7 +83,10 @@ const logFile = path.join(storePath, 'logs', 'mole.log');
 const logOutpot: any[] = [];
 
 if(!app.isPackaged) {
-    logOutpot.push(new winston.transports.Console({format: winston.format.simple()}));
+    logOutpot.push(new winston.transports.Console({format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.printf(({timestamp, level, message}) => `${timestamp} ${level}: ${message}`)
+    )}));
     Configs.update("loglevel", "debug");
 } else {
     logOutpot.push(new winston.transports.File({

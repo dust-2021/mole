@@ -3,6 +3,13 @@ import {BaseDir} from "../public";
 import path from "path";
 
 export let appWindow: BrowserWindow ;
+let isQuitting = false;
+
+// 供外部调用，标记为退出状态后关闭窗口
+export function setQuitting() {
+    isQuitting = true;
+    app.quit();
+}
 
 export function mainWindow() {
 
@@ -20,6 +27,14 @@ export function mainWindow() {
             contextIsolation: true,
             sandbox: true,
             spellcheck: false
+        }
+    });
+
+    // 窗口关闭时隐藏到托盘而不是退出
+    appWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            appWindow.hide();
         }
     });
 
