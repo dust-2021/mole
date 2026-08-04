@@ -75,7 +75,7 @@ import { ref, computed, watch, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Minus, Close, SwitchButton, HomeFilled, ChatDotRound, Setting } from '@element-plus/icons-vue'
 import { ipcSend } from '../utils/publicType'
-import { saveStore } from '../utils/stores'
+import { saveStore, HallStore } from '../utils/stores'
 import { Connection } from '../utils/conn'
 import { roomer } from '../utils/roomController'
 import { roomOut } from '../utils/api/ws/room'
@@ -154,6 +154,9 @@ function logout() {
     roomer.deleteRoom(r.roomId)
   }
   openRooms.value = []
+  // 清空大厅聊天状态
+  const hallStore = HallStore()
+  delete hallStore.states[props.serverName]
   Connection.getInstance(props.serverName).close()
   router.push('/')
 }

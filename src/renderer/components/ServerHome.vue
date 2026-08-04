@@ -205,11 +205,13 @@ async function toggleHall() {
 }
 
 function handleHallMsg(r: wsResp) {
+  console.log('hall msg', r)
+  const msg = r.data as { senderId: number; senderUuid: string; senderName: string; data: string; timestamp: number };
   hallStore.addMsg(props.serverName, {
-    senderUuid: r.data?.senderUuid ?? '',
-    senderName: r.data?.senderName ?? '',
-    text: r.data?.data ?? r.data?.text ?? '',
-    timestamp: r.data?.timestamp ?? Date.now(),
+    senderUuid: msg.senderUuid ?? '',
+    senderName: msg.senderName ?? '',
+    text: msg.data ?? '',
+    timestamp: msg.timestamp ?? Date.now(),
   })
   // 滚动处理（参照 RoomView）
   nextTick(() => {

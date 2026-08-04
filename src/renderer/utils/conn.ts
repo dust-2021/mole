@@ -106,6 +106,9 @@ export class Connection {
         try {
             // 响应服务器消息
             if (await this.handleByMethod.has(r.method)) {
+                if (r.method.startsWith('publish.')) {
+                    log('info', `received publish message: ${r.method}`);
+                }
                 f = await this.handleByMethod.get(r.method);
             } else if (await Connection.publicHandleByMethod.has(r.method)) {
                 f = await Connection.publicHandleByMethod.get(r.method);
