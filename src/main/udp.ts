@@ -6,7 +6,6 @@ import {appWindow} from "./app/window";
 enum UdpMsgType {
     turn = "turn",
     connectPeer = "connectPeer",
-
     peerReply = "peerReply",
 }
 

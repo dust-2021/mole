@@ -5,6 +5,7 @@ import fs = require('fs');
 import { Configs, Logger } from "./public";
 import { handleIPC, NatMethod } from "./udp";
 import { handleIPC as wgIpc } from './extern/wireguard/wireguard';
+import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
 
 // 注册主进程和渲染进程通信接口
 export function initialIPC(ipc: typeof ipcMain) {
@@ -67,6 +68,10 @@ export function initialIPC(ipc: typeof ipcMain) {
             return false;
         }
     });
+
+    ipc.handle("request", async (Event, url: string, method: string, headers: Record<string, string>, data?: any) => {
+        return await request(url, method, headers, data);
+    });
 }
 
 function getMacAddress(): string {
@@ -81,6 +86,22 @@ function getMacAddress(): string {
         }
     }
     return "";
+}
+
+async function request(url: string, method: string, headers: Record<string, string>, data?: any): Promise<{code: number, data?: any, message?: string}> {
+   const axiosHeaders = new AxiosHeaders();
+   axiosHeaders.set("Accept", "application/json");
+   for (const [key, value] of Object.entries(headers)) {
+       axiosHeaders.set(key, value);
+   }
+   let body: AxiosRequestConfig = {
+       headers: axiosHeaders, validateStatus: (status) => true, method: method.toUpperCase(),
+   }
+   const resp =  await axios.request({ ...body, url, data });
+   if (resp.status !== 200) {
+        return { code: resp.status, message: resp.statusText };
+   }
+   return resp.data as {code: number, data?: any, message?: string};
 }
 
 export function initialize(ipc: typeof ipcMain) {

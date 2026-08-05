@@ -1,4 +1,4 @@
-import {HttpResp, log, server} from "./publicType"
+import {HttpResp, log, server, request} from "./publicType"
 import {Services} from './stores'
 import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
 import {Token} from "./token";
@@ -16,23 +16,18 @@ function queryFormatter(data: Map<string, any>): string {
 * 成功：{"code": 0, "data": any}  失败：{"code": int, "message": str}
 *
 * */
-export async function fetch(serverName: string, method: string, url: string, withToken: boolean, data?: Map<string, any>): Promise<HttpResp> {
+export async function fetch(serverName: string, method: "get" | "post", url: string, withToken: boolean, data?: Map<string, any>): Promise<HttpResp> {
+    // TODO: 请求转移到主进程中进行
     const svr = Services().get(serverName);
     if (!svr) return { code: -1, message: `未找到服务器：${serverName}` };
     const host = `${svr.certify? 'https://': 'http://'}${svr.host}:${svr.port}`;
-    const headers = new AxiosHeaders();
-    headers.set("Accept", "application/json");
-    if (withToken && svr.token) {
-        headers.set("Token", svr.token?.token);
-    }
-    let body: AxiosRequestConfig = {
-        headers: headers, validateStatus: (status) => true, method: method.toUpperCase(),
-    }
-    let resp: AxiosResponse | null = null;
+    
+    let trueUrl = "";
+    let postData: any = undefined;
     switch (method) {
         case "get":
             const queryString = (data === undefined || data === null) ? "" : queryFormatter(data);
-            body.url = `${host}/${url}${queryString}`;
+            trueUrl = `${host}/${url}${queryString}`;
             break;
         case "post":
             let query: string = "";
@@ -40,22 +35,23 @@ export async function fetch(serverName: string, method: string, url: string, wit
                 const obj = Object.fromEntries(data);
                 query = JSON.stringify(obj);
             }
-            body.url = `${host}/${url}`;
-            body.data = query;
+            trueUrl = `${host}/${url}`;
+            postData = query;
             break;
         default:
             throw new Error("Unknown method");
     }
     try {
-        resp = await axios.request(body);
+        let resp = await request(trueUrl, method, {"Token": svr.token?.token ?? ""}, postData);
         if (!resp) return {code: -1, message: ''};
         // token失效时重新获取
-        if (resp.status === 403 || resp.status === 401) {
-            resp = await refreshTokenDo(svr, host, body);
+        if (resp.code === 403 || resp.code === 401) {
+            await refreshToken(svr, host);
+            // 重新发起请求
+            resp = await request(trueUrl, method, {"Token": svr.token?.token ?? ""}, postData);
         }
-        const result = resp.data as HttpResp;
-        log(result.code === 0 ? 'info' : 'error', `${serverName} | ${url} | ${method} | ${result.code === 0 ? 'success' : result.message}`);
-        return resp.data;
+        log(resp.code === 0 ? 'info' : 'error', `${serverName} | ${url} | ${method} | ${resp.code === 0 ? 'success' : resp.message}`);
+        return resp;
     } catch (e: any) {
         log('error', `request failed: ${method} | ${url}` + e.toString());
         return {
@@ -65,19 +61,15 @@ export async function fetch(serverName: string, method: string, url: string, wit
 }
 
 // 刷新token并再次发起请求
-async function refreshTokenDo(svr: server, host: string, body: AxiosRequestConfig): Promise<AxiosResponse> {
-        const r = await axios.post(`${host}/api/login`, JSON.stringify({
+async function refreshToken(svr: server, host: string): Promise<void> {
+        const r = await request(`${host}/api/login`, "post", {}, JSON.stringify({
             username: svr.defaultUser?.username,
             password: svr.defaultUser?.password
         }));
-        if (r.status !== 200 || r.data.code !== 0) {
+        if (r.code !== 0) {
             throw new AxiosError("refresh token failed");
         }
-        svr.token = new Token(r.data.data);
-        if (body.headers) {
-            body.headers["Token"] = svr.token?.token;
-        }
-        return await axios.request(body);
+        svr.token = new Token(r.data);
 }
 
 

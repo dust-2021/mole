@@ -92,7 +92,8 @@ export const udpFunc = {
             });
         }
         await ipcInvoke('udp', 'connect', ip, port, uid, timeout_s);
-    }
+    },
+    // TODO: udp直连心跳失败后，添加回调函数
 }
 
 ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
@@ -101,6 +102,11 @@ ipcOn('msg', (type_: 'info' | 'success' | 'error' | 'warning', msg: string) => {
         message: msg
     })
 })
+
+// 主进程代理http请求
+export async function request(url: string, method: string, headers: Record<string, string>, data?: any): Promise<HttpResp> {
+    return await ipcInvoke("request", url, method, headers, data);
+}
 
 export const wireguardFunc = {
     // 创建wireguard房间，ip是本机vlan地址，ip_area是vlan网段
