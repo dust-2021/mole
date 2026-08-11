@@ -6,7 +6,7 @@ import { fetch } from "../../request";
 export async function login(serverName: string, name: string, password: string): Promise<{ code: number, data: Token | null }> {
 
     const data = new Map<string, any>([["username", name], ["password", password]]);
-    const resp = await fetch(serverName, "post", "api/login", false, data);
+    const resp = await fetch(serverName, "post", "api/login", data);
     if (resp.code !== 0) {
         return { code: resp.code, data: null };
     }
@@ -14,13 +14,13 @@ export async function login(serverName: string, name: string, password: string):
 }
 
 export async function logout(serverName: string): Promise<boolean> {
-    const resp = await fetch(serverName, "get", "sapi/logout", true)
+    const resp = await fetch(serverName, "get", "sapi/logout")
     return resp.code === 0;
 
 }
 
 export async function createUsers(serverName: string, count: number): Promise<{code: number, data:{ username: string, password: string }[]}> {
-    const resp = await fetch(serverName, "get", `sapi/system/user/createPieces?count=${count}`, true);
+    const resp = await fetch(serverName, "get", `sapi/system/user/createPieces?count=${count}`);
     if (resp.code !== 0) {
         return {code: resp.code, data: []};
     }
@@ -34,16 +34,16 @@ export async function registerUser(serverName: string, username: string, passwor
         ["phone", phone],
         ["email", email]
     ]);
-    const resp = await fetch(serverName, "post", "api/register", false, data);
+    const resp = await fetch(serverName, "post", "api/register", data);
     return resp.code;
 }
 
 export async function addBlacklist(serverName: string, type: "uuid" | "ip" | "device", id:string): Promise<boolean> {
-    const resp = await fetch(serverName, "get", `api/blacklist/add?id=${id}`, true);
+    const resp = await fetch(serverName, "get", `api/blacklist/add?id=${id}`);
     return resp.code === 0;
 }
 
 export async function deleteBlacklist(serverName: string, type: "uuid" | "ip" | "device", id:string): Promise<boolean> {
-    const resp = await fetch(serverName, "get", `api/blacklist/delete?id=${id}`, true);
+    const resp = await fetch(serverName, "get", `api/blacklist/delete?id=${id}`);
     return resp.code === 0;
 }

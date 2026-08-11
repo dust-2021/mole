@@ -1,6 +1,5 @@
 import {HttpResp, log, server, request} from "./publicType"
 import {Services} from './stores'
-import axios, {AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse} from "axios";
 import {Token} from "./token";
 
 // 参数格式化为请求路由参数
@@ -16,8 +15,7 @@ function queryFormatter(data: Map<string, any>): string {
 * 成功：{"code": 0, "data": any}  失败：{"code": int, "message": str}
 *
 * */
-export async function fetch(serverName: string, method: "get" | "post", url: string, withToken: boolean, data?: Map<string, any>): Promise<HttpResp> {
-    // TODO: 请求转移到主进程中进行
+export async function fetch(serverName: string, method: "get" | "post", url: string, data?: Map<string, any>): Promise<HttpResp> {
     const svr = Services().get(serverName);
     if (!svr) return { code: -1, message: `未找到服务器：${serverName}` };
     const host = `${svr.certify? 'https://': 'http://'}${svr.host}:${svr.port}`;
@@ -67,7 +65,7 @@ async function refreshToken(svr: server, host: string): Promise<void> {
             password: svr.defaultUser?.password
         }));
         if (r.code !== 0) {
-            throw new AxiosError("refresh token failed");
+            throw new Error("refresh token failed");
         }
         svr.token = new Token(r.data);
 }

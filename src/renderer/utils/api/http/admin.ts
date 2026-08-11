@@ -2,7 +2,7 @@ import {fetch} from "../../request";
 
 
 export async function getDynimicConfigs(serverName: string): Promise<{code: number, data: Record<string, any>}> {
-    const resp = await fetch(serverName, "get", `sapi/config/getDynimicConfigs`, true);
+    const resp = await fetch(serverName, "get", `sapi/config/getDynimicConfigs`);
     if (resp.code !== 0) {
         return { code: resp.code, data: {} };
     }
@@ -11,6 +11,6 @@ export async function getDynimicConfigs(serverName: string): Promise<{code: numb
 
 // 设置用户公共注册
 export async function setPublicRegister(serverName: string, to: boolean): Promise<boolean> {
-    const resp = await fetch(serverName, "get", `sapi/config/setPublicRegister?enable=${to}`, true);
+    const resp = await fetch(serverName, "get", `sapi/config/setPublicRegister?enable=${to}`);
     return resp.code === 0;
 }

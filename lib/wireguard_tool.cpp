@@ -226,7 +226,7 @@ bool add_adapter_route(const NET_LUID &luid, DWORD interface_index, const char *
     return result == NO_ERROR || result == ERROR_OBJECT_ALREADY_EXISTS;
 }
 
-bool bind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char *ip_area)
+DWORD bind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char *ip_area)
 {
     NET_LUID luid;
     WireGuardGetAdapterLUID(handle, &luid);
@@ -235,14 +235,14 @@ bool bind_adapter(WIREGUARD_ADAPTER_HANDLE handle, const char *ip, const char *i
     if (!set_adapter_ip(interface_index, ip, "255.255.0.0"))
     {
         log(WIREGUARD_LOG_ERR, "set adapter ip failed");
-        return false;
+        return 0;
     }
     if (!add_adapter_route(luid, interface_index, ip_area, MASK))
     {
         log(WIREGUARD_LOG_ERR, "set adapter route failed");
-        return false;
+        return 0;
     }
-    return true;
+    return interface_index;
 }
 
 // 清理虚拟网卡 IP 和路由

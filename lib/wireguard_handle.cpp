@@ -130,9 +130,11 @@ private:
         initial();
         WireGuardSetLogger((WIREGUARD_LOGGER_CALLBACK)&log_dll);
         // 初始化广播转发器
-        auto &trans = broadcast_trans::getInstance();
-        trans.run();
+        auto &trans = transporter::getInstance();
         log(WIREGUARD_LOG_INFO, "handler created");
+        if(!parse_allowed_ip(std::string("224.0.0.0/4"), mutilcast_ip)){
+            log(WIREGUARD_LOG_ERR, "init multicast ip failed");
+        }
     }
 
     WireGuardHandle()
@@ -143,6 +145,7 @@ private:
 public:
     static WireGuardHandle h_instance;
     static std::once_flag initInstanceFlag;
+    static WIREGUARD_ALLOWED_IP mutilcast_ip;
     std::unordered_map<std::wstring, std::unique_ptr<room_config>> rooms;
     WireGuardHandle(const WireGuardHandle &) = delete;
 
@@ -158,7 +161,7 @@ public:
         // 释放winsock
         WSACleanup();
         FreeLibrary(wg);
-        auto &trans = broadcast_trans::getInstance();
+        auto &trans = transporter::getInstance();
         trans.stop_trans();
         log(WIREGUARD_LOG_INFO, "handler closed");
     }
@@ -178,6 +181,12 @@ public:
         {
             return true;
         }
+        // TODO: 由于中转服务器存在，目前只支持一个房间，后续可扩展为多个房间
+        if (rooms.size() != 0)
+        {
+            log(WIREGUARD_LOG_ERR, "only support one room");
+            return false;
+        }
         auto handle = WireGuardCreateAdapter(name, L"WireGuard Tunnel", nullptr);
         if (handle == nullptr)
         {   
@@ -188,12 +197,23 @@ public:
         auto conf = std::make_unique<room_config>(handle, name, public_key, private_key, listen_port);
         conf->adapter_ip = adapter_ip;
         conf->adapter_ip_area = ip_area;
-        if (!conf->set_config() || !bind_adapter(handle, adapter_ip, ip_area))
+        if (!conf->set_config())
         {
             WireGuardCloseAdapter(handle);
             log(WIREGUARD_LOG_ERR, "adapter create failed", GetLastError());
             return false;
         }
+        auto interface_index = bind_adapter(handle, adapter_ip, ip_area);
+        if (interface_index == 0)
+        {
+            WireGuardCloseAdapter(handle);
+            log(WIREGUARD_LOG_ERR, "adapter bind failed", GetLastError());
+            return false;
+        }
+        // 启动广播和组播转发
+        // TODO: 多房间时修改转发器逻辑
+        auto& trans = transporter::getInstance();
+        trans.run(interface_index);
         // 去除清空peer的状态码
         conf->interface_config.Flags = room_config::BASE_FLAG;
         rooms[name] = std::move(conf);
@@ -219,6 +239,9 @@ public:
         WireGuardCloseAdapter(room->handle);
         log_dll(WIREGUARD_LOG_INFO, 0, std::wstring(L"adapter deleted of room:").append(name).c_str());
         rooms.erase(name);
+        // TODO: 多房间时添加额外识别逻辑
+        auto& trans = transporter::getInstance();
+        trans.stop_trans();
     }
 
     // 添加成员并修改wireguard适配器配置
@@ -251,9 +274,10 @@ public:
         memcpy(new_peer.PublicKey, pub_key, WIREGUARD_KEY_LENGTH);
         new_peer.AllowedIPsCount = allowed_ip_count;
         room->peers[peer_name] = new_peer;
-        // 初始化转发IP列表
         room->interface_config.PeersCount = room->peers.size();
-        room->peer_allowed_ips[peer_name] = std::vector<WIREGUARD_ALLOWED_IP>();
+        room->peer_allowed_ips[peer_name] = std::vector<WIREGUARD_ALLOWED_IP>(
+            {mutilcast_ip} // 初始化时添加组播地址，wireguard暂不支持组播
+        );
         for (size_t i = 0; i < allowed_ip_count; i++)
         {
             WIREGUARD_ALLOWED_IP allowed_ip = {};
@@ -316,6 +340,7 @@ public:
 
 std::once_flag WireGuardHandle::initInstanceFlag;
 WireGuardHandle WireGuardHandle::h_instance;
+WIREGUARD_ALLOWED_IP WireGuardHandle::mutilcast_ip;
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // |-------------------------- 导出函数定义 --------------------------- |
@@ -377,7 +402,7 @@ extern "C"
     }
 
     EXPORT void add_trans(const char ** ips, size_t count) {
-        auto & trans = broadcast_trans::getInstance();
+        auto & trans = transporter::getInstance();
     }
 
     EXPORT response del_peer(const wchar_t *room_name, const wchar_t *peer_name)

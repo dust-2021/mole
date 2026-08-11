@@ -1,7 +1,7 @@
 import {fetch} from "../../request";
 
 export async function serverTime(serverName: string): Promise<number | null> {
-    const resp = await fetch(serverName, 'get', 'api/server/time', false);
+    const resp = await fetch(serverName, 'get', 'api/server/time');
     if (resp.code !== 0) {
         return null;
     }
@@ -26,7 +26,7 @@ export async function roomList(serverName: string, page: number = 1, size: numbe
     rooms: roomInfo[]
 }}> {
     const data = new Map<string, any>([['page', page], ['size', size]]);
-    const resp = await fetch(serverName, 'get', 'ws/room/list', true, data);
+    const resp = await fetch(serverName, 'get', 'ws/room/list', data);
     if (resp.code !== 0) {
         return {code: resp.code, data: {total: 0, rooms: []}};
     }
@@ -37,7 +37,7 @@ export async function roomList(serverName: string, page: number = 1, size: numbe
 export async function wgInfo(serverName: string): Promise<{code: number, data: {publicKey: string, listenPort: number,
     vlanIp: [number, number]
 }}> {
-    const resp = await fetch(serverName, 'get', 'sapi/info/wginfo', true);
+    const resp = await fetch(serverName, 'get', 'sapi/info/wginfo');
     if (resp.code !== 0) {
         return {code: resp.code, data: {publicKey: "", listenPort: 0, vlanIp: [0, 0]}};
     }
@@ -46,7 +46,7 @@ export async function wgInfo(serverName: string): Promise<{code: number, data: {
 
 // 服务器当前连接信息
 export async function connectingInfo(serverName: string): Promise<{serverTime: number, wsConnected: number, wgPeers: number, rooms: number}> {
-    const resp = await fetch(serverName, 'get', 'sapi/info/connecting', true);
+    const resp = await fetch(serverName, 'get', 'sapi/info/connecting');
     if (resp.code !== 0) {
         return {serverTime: 0, wsConnected: 0, wgPeers: 0, rooms: 0};
     }
