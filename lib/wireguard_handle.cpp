@@ -132,9 +132,6 @@ private:
         // 初始化广播转发器
         auto &trans = transporter::getInstance();
         log(WIREGUARD_LOG_INFO, "handler created");
-        if(!parse_allowed_ip(std::string("224.0.0.0/4"), mutilcast_ip)){
-            log(WIREGUARD_LOG_ERR, "init multicast ip failed");
-        }
     }
 
     WireGuardHandle()
@@ -145,7 +142,6 @@ private:
 public:
     static WireGuardHandle h_instance;
     static std::once_flag initInstanceFlag;
-    static WIREGUARD_ALLOWED_IP mutilcast_ip;
     std::unordered_map<std::wstring, std::unique_ptr<room_config>> rooms;
     WireGuardHandle(const WireGuardHandle &) = delete;
 
@@ -275,9 +271,7 @@ public:
         new_peer.AllowedIPsCount = allowed_ip_count;
         room->peers[peer_name] = new_peer;
         room->interface_config.PeersCount = room->peers.size();
-        room->peer_allowed_ips[peer_name] = std::vector<WIREGUARD_ALLOWED_IP>(
-            {mutilcast_ip} // 初始化时添加组播地址，wireguard暂不支持组播
-        );
+        room->peer_allowed_ips[peer_name] = std::vector<WIREGUARD_ALLOWED_IP>();
         for (size_t i = 0; i < allowed_ip_count; i++)
         {
             WIREGUARD_ALLOWED_IP allowed_ip = {};
@@ -340,7 +334,6 @@ public:
 
 std::once_flag WireGuardHandle::initInstanceFlag;
 WireGuardHandle WireGuardHandle::h_instance;
-WIREGUARD_ALLOWED_IP WireGuardHandle::mutilcast_ip;
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // |-------------------------- 导出函数定义 --------------------------- |
