@@ -19,8 +19,10 @@ struct multicast_marker
 
 // 识别魔数
 static constexpr uint32_t MULTICAST_MARKER_MAGIC = 0x4D434D54;
-// 封装长度阈值：小于该长度才封装/还原，防止封装后超过 wireguard MTU
+// 封装长度阈值：小于该长度才封装/还原，防止封装后超过 wireguard MTU(1420)
 static constexpr uint16_t MULTICAST_ENCAP_LIMIT = 1400;
+// 组播隧道传输总开关：0 = 只转发广播(255.255.255.255)，不启用组播封装/解析；1 = 启用组播
+#define MULTICAST_TRANSPORT_ENABLED 0
 
 // 用于转发三层网络中的广播数据包到wireguard隧道
 class transporter
@@ -78,8 +80,13 @@ public:
         }
     }
 
-    void run(DWORD wg_idx)
+    void run(DWORD wg_idx, const char *wg_ip_str)
     {   
+        // 允许重复启动：stop_trans() 会把 stop 置为 true，若不重置，
+        // 再次启动时两个线程的 while(!stop) 直接不成立，立即退出
+        stop = false;
+        // 记录 wg 网卡虚拟 IP：泛洪注入时作为源地址，否则对端按 peer AllowedIPs 过滤会丢弃包
+        wg_ip = (wg_ip_str != nullptr) ? inet_addr(wg_ip_str) : INADDR_NONE;
         // 广播转发线程，复制所有广播到每个peer，组播数据包进行再封装
         braoder_thread = std::thread([this, wg_idx]{
             auto filter = multicast_filter + std::to_string(wg_idx);
@@ -131,6 +138,14 @@ public:
                     log(WIREGUARD_LOG_ERR, "parse broadcast data failed");
                     continue;
                 }
+                // 只转发 UDP 且总长度小于阈值的包：
+                // 1) 非 UDP 组播/广播没有封装标记，接收端无法还原，直接放弃
+                // 2) 大包转发会超过 wg MTU(1420) 且泛洪无意义，直接放弃
+                //    注意 udp_header->Length 是网络字节序，不能直接拿来比较大小
+                if (udp_header == NULL || packet_l >= MULTICAST_ENCAP_LIMIT)
+                {
+                    continue;
+                }
 
                 // 组播判断（DstAddr 为网络字节序）：224.0.0.0/4 为组播，255.255.255.255 为受限广播。
                 // WireGuard 不支持组播路由，所以两者统一走"广播/组播转单播泛洪"：
@@ -143,11 +158,8 @@ public:
                 {
                     continue;
                 }
-                
-                // 收发端约定小于一定长度才进行封装/解封装，防止封装后超过 wireguard MTU。
-                // 封装：在 UDP payload 前插入 8 字节标记头，携带原始组播/广播地址供接收端还原。
-                // 只对 UDP 广播/组播封装，其它协议（TCP/ICMP 等）照常单播泛洪但不打标。
-                if (packet_l < MULTICAST_ENCAP_LIMIT && udp_header != NULL)
+#if MULTICAST_TRANSPORT_ENABLED
+                // 封装：在 UDP payload 前插入 8 字节标记头，携带原始组播/广播地址供接收端还原
                 {
                     uint32_t orig_dst = ip_header->DstAddr; // 原始组播/广播地址
                     BYTE *payload = (BYTE *)udp_header + sizeof(WINDIVERT_UDPHDR);
@@ -165,15 +177,21 @@ public:
                     ip_header->Length = htons(ntohs(ip_header->Length) + (uint16_t)sizeof(multicast_marker));
                     packet_l += (uint32_t)sizeof(multicast_marker);
                 }
+#endif
 
                 std::shared_lock<std::shared_mutex> lock(peer_rw_lock);
                 if (peers.empty()) continue;
                 for (const auto &p : peers)
                 {
-                    // 如果目标地址已经是peer的ip地址，则不转发
-                    if (p == ip_header->DstAddr) continue;
+                    // 源地址改为 wg 网卡虚拟 IP：对端 wg 网卡按 peer AllowedIPs 过滤，
+                    // 若保留物理网卡源地址，包会被对端丢弃，转发无效
+                    ip_header->SrcAddr = wg_ip;
                     ip_header->DstAddr = p;
                     if (!WinDivertHelperCalcChecksums(packet, packet_l, &addr, 0)) continue;
+                    // IfIdx/SubIfIdx 必须同时置 0 才会按目标地址自动路由到 wg 网卡；
+                    // 只置 IfIdx 而 SubIfIdx 残留物理网卡值，包仍会被注入物理网卡造成断网
+                    addr.Network.IfIdx = 0;
+                    addr.Network.SubIfIdx = 0;
                     if (!WinDivertSend(h, packet, packet_l, nullptr, &addr))
                     {
                         log(WIREGUARD_LOG_ERR, "windivert send failed", GetLastError());
@@ -186,6 +204,7 @@ public:
             windivert_handle.store(NULL, std::memory_order_release);
             log(WIREGUARD_LOG_INFO, "stop layer 3 broadcast transport with filter:" + filter);
         });
+#if MULTICAST_TRANSPORT_ENABLED
         parser_thread = std::thread([this, wg_idx]{
             // 接收端：嗅探从 wireguard 网卡进入的 UDP 包，识别隧道组播并还原
             auto rx_filter = "inbound and ifIdx == " + std::to_string(wg_idx) + " and udp";
@@ -243,7 +262,7 @@ public:
                     continue; // 非 IPv4/UDP，放行
                 }
                 uint16_t udp_len = ntohs(udp_header->Length);
-                if (udp_len < (uint16_t)(sizeof(WINDIVERT_UDPHDR) + sizeof(multicast_marker)))
+                if ((udp_len < (uint16_t)(sizeof(WINDIVERT_UDPHDR) + sizeof(multicast_marker))))
                 {
                     continue; // 太短不可能是封装包
                 }
@@ -284,8 +303,9 @@ public:
             rx_handle.store(NULL, std::memory_order_release);
             log(WIREGUARD_LOG_INFO, "stop parser with filter: " + rx_filter);
         });
-        braoder_thread.detach();
         parser_thread.detach();
+#endif
+        braoder_thread.detach();
     }
 
 private:
@@ -295,13 +315,18 @@ private:
     std::thread braoder_thread;
     std::thread parser_thread;
     std::atomic<bool> stop{false};
+    uint32_t wg_ip{INADDR_NONE};             // wg 网卡虚拟 IP，泛洪注入时的源地址
     static std::atomic<HANDLE> windivert_handle; // 发送端嗅探句柄
     static std::atomic<HANDLE> rx_handle;        // 接收端嗅探句柄
     static std::atomic<HANDLE> inject_handle;    // 接收端注入句柄
     transporter() = default;
 };
 
+#if MULTICAST_TRANSPORT_ENABLED
 const char *transporter::multicast_filter = "outbound and (ip.DstAddr == 255.255.255.255 or (ip.DstAddr >= 224.0.0.0 and ip.DstAddr <= 239.255.255.255)) and ifIdx !=";
+#else
+const char *transporter::multicast_filter = "outbound and (ip.DstAddr == 255.255.255.255) and ifIdx !=";
+#endif
 transporter transporter::bt_instance;
 std::atomic<HANDLE> transporter::windivert_handle{NULL};
 std::atomic<HANDLE> transporter::rx_handle{NULL};

@@ -209,7 +209,7 @@ public:
         // 启动广播和组播转发
         // TODO: 多房间时修改转发器逻辑
         auto& trans = transporter::getInstance();
-        trans.run(interface_index);
+        trans.run(interface_index, adapter_ip);
         // 去除清空peer的状态码
         conf->interface_config.Flags = room_config::BASE_FLAG;
         rooms[name] = std::move(conf);
