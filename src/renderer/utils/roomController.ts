@@ -127,18 +127,27 @@ export class Room {
 
     // 检查wg直连，失败后回退
     private async checkDirectConn(uuid: string, name: string, ip: string, port: number, timeout_s: number) {
+        // endpoint 校验：peer 已回退为中继（wgIp 为空 或 endpoint 指向中继服务器）时，
+        // 数据走的是中继路径而非直连，跳过 UDP 直连验证，避免误判"直连成功"
+        const m = this.members.value.get(uuid);
+        if (!m || m.wgIp === "" || m.wgPort === 0 ||
+            (m.wgIp === this.host && m.wgPort === this.port)) {
+            return;
+        }
         // wg直连后立刻进行udp连接尝试
         await udpFunc.connect(ip, port, timeout_s, async (f: boolean) => {
 
             if (!this.members.value.has(uuid)) return;
             await this.modifyConnFlagLocked(uuid, f ? 1 : 2);
             await this.checkInMsg([{ fromUuid: "", text: f ? `直连'${name}'成功` : `直连'${name}'失败`, timestamp: Date.now(), fromUsername: "" }]);
-            // 直连失败，回退为中转
+            // 直连失败，回退为中转：更新该 peer 的 endpoint 为中继服务器，peer 保留
             if (!f) {
-                this.members.value.get(uuid)!.wgIp = "";
-                this.members.value.get(uuid)!.wgPort = 0;
-                // await wireguardFunc.updatePeerEndpoint(this.roomId, uuid, this.host, this.port);
-                await wireguardFunc.delPeer(this.roomId, uuid);
+                const m = this.members.value.get(uuid);
+                if (!m) return;
+                m.wgIp = "";
+                m.wgPort = 0;
+                const vlan = `${this.vlanPrefix}.${m.vlan >> 8}.${m.vlan & 0xff}`;
+                await wireguardFunc.addPeer(this.roomId, uuid, this.host, this.port, m.publicKey, [vlan], 1);
             }
         });
     }
@@ -154,18 +163,23 @@ export class Room {
         await wireguardFunc.addTransIps([vlan]);
         if (m.wgIp !== "" && m.wgPort !== 0) {
             await this.modifyConnFlagLocked(m.uuid, 0);
-            await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
+            const ok = await wireguardFunc.addPeer(this.roomId, m.uuid, m.wgIp, m.wgPort, m.publicKey,
                 [vlan], 1);
-            await this.checkDirectConn(m.uuid, m.name, vlan, m.udpPort, 10);
+            // endpoint 校验：addPeer 成功（endpoint 已生效）才进行直连验证；
+            // 直连测试后台并行进行，不阻塞"加入房间"消息
+            if (ok) {
+                this.checkDirectConn(m.uuid, m.name, vlan, m.udpPort, 10)
+                    .catch(e => log("error", String(e)));
+            }
         };
         this.checkInMsg([{ fromUuid: "", text: `${m.name}加入房间`, timestamp: Date.now(), fromUsername: "" }]);
     }
 
     public async addMembers(m: member[]) {
         if (m.length === 0) return;
-        for (const mem of m) {
-            await this.addMember(mem);
-        }
+        // 并行加入成员：前一个成员的直连测试(最长10s)不再阻塞后续成员
+        // 单个成员失败不影响其他成员加入
+        await Promise.all(m.map(mem => this.addMember(mem).catch(e => log("error", String(e)))));
     }
 
     public async delMember(userUUid: string, force: boolean = false) {
@@ -209,8 +223,11 @@ export class Room {
         if (!peer) return;
         peer.wgIp = ip;
         peer.wgPort = port;
-        await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
-        await this.checkDirectConn(peer_uuid, peer.name, this.vlanPrefix + `.${peer.vlan >> 8}.${peer.vlan & 0xff}`, peer.udpPort, 10);
+        const ok = await wireguardFunc.addPeer(this.roomId, peer.uuid, ip, port, peer.publicKey, [`${this.vlanPrefix}.${peer.vlan >> 8}.${peer.vlan & 0xff}/32`], 1);
+        // endpoint 校验：addPeer 成功（endpoint 已更新为直连地址）才进行直连验证
+        if (ok) {
+            await this.checkDirectConn(peer_uuid, peer.name, this.vlanPrefix + `.${peer.vlan >> 8}.${peer.vlan & 0xff}`, peer.udpPort, 10);
+        }
     }
 
     public async printWg() {

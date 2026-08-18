@@ -1,5 +1,7 @@
 #include <unordered_map>
 #include <string>
+#include <vector>
+#include <optional>
 #include "src/wireguard.h"
 #include "wireguard_tool.cpp"
 #include "broadcaster.cpp"
@@ -241,6 +243,7 @@ public:
     }
 
     // 添加成员并修改wireguard适配器配置
+    // 已存在的 peer 允许重复添加：用于更新 endpoint 等配置，直接重赋值 peer 结构体并重新设置 wg
     _NODISCARD bool add_peer(const wchar_t *adapter_name, const wchar_t *peer_name, const u_char *pub_key,
                              const char *ip, uint16_t port, const char **allowed_ips, size_t allowed_ip_count)
     {
@@ -250,12 +253,10 @@ public:
             return false;
         };
         auto &room = rooms[adapter_name];
+        // 是否更新已有 peer
+        const bool existed = room->peers.find(peer_name) != room->peers.end();
+
         WIREGUARD_PEER new_peer = {};
-        if (room->peers.find(peer_name) != room->peers.end())
-        {
-            log(WIREGUARD_LOG_ERR, "add peer existed");
-            return false;
-        }
         new_peer.Flags = room_config::BASE_PEER_FLAG;
         new_peer.PersistentKeepalive = 15;
         // 设置对端真实地址
@@ -269,9 +270,9 @@ public:
         }
         memcpy(new_peer.PublicKey, pub_key, WIREGUARD_KEY_LENGTH);
         new_peer.AllowedIPsCount = allowed_ip_count;
-        room->peers[peer_name] = new_peer;
-        room->interface_config.PeersCount = room->peers.size();
-        room->peer_allowed_ips[peer_name] = std::vector<WIREGUARD_ALLOWED_IP>();
+
+        // 先解析 allowed_ips 到临时列表，避免解析失败时污染已有配置
+        std::vector<WIREGUARD_ALLOWED_IP> new_allowed;
         for (size_t i = 0; i < allowed_ip_count; i++)
         {
             WIREGUARD_ALLOWED_IP allowed_ip = {};
@@ -280,13 +281,35 @@ public:
                 log(WIREGUARD_LOG_WARN, std::string("allowed_ip format failed: ") + allowed_ips[i]);
                 continue;
             }
-            room->peer_allowed_ips[peer_name].push_back(allowed_ip);
+            new_allowed.push_back(allowed_ip);
         }
-        // 配置失败回退
+
+        // 更新已有 peer 时保存旧配置，用于配置失败时回滚
+        std::optional<WIREGUARD_PEER> old_peer;
+        std::optional<std::vector<WIREGUARD_ALLOWED_IP>> old_allowed;
+        if (existed)
+        {
+            old_peer = room->peers[peer_name];
+            old_allowed = room->peer_allowed_ips[peer_name];
+        }
+
+        room->peers[peer_name] = new_peer;
+        room->interface_config.PeersCount = room->peers.size();
+        room->peer_allowed_ips[peer_name] = new_allowed;
+
+        // 配置失败回退：更新已有 peer 时恢复旧配置，新增 peer 时删除
         if (!room->set_config())
         {
-            room->peers.erase(peer_name);
-            room->peer_allowed_ips.erase(peer_name);
+            if (existed && old_peer.has_value() && old_allowed.has_value())
+            {
+                room->peers[peer_name] = *old_peer;
+                room->peer_allowed_ips[peer_name] = *old_allowed;
+            }
+            else
+            {
+                room->peers.erase(peer_name);
+                room->peer_allowed_ips.erase(peer_name);
+            }
             room->interface_config.PeersCount = room->peers.size();
             return false;
         };
