@@ -140,14 +140,15 @@ export class Room {
             if (!this.members.value.has(uuid)) return;
             await this.modifyConnFlagLocked(uuid, f ? 1 : 2);
             await this.checkInMsg([{ fromUuid: "", text: f ? `直连'${name}'成功` : `直连'${name}'失败`, timestamp: Date.now(), fromUsername: "" }]);
-            // 直连失败，回退为中转：更新该 peer 的 endpoint 为中继服务器，peer 保留
+            // 直连失败，回退为中转：删除直连 peer，让流量走中继服务器 peer(/16) 中转。
+            // 注意：不能把该 peer 的 endpoint 改成中继服务器——wg 是端到端加密，
+            // 成员公钥加密的包服务器无法解密，会被丢弃导致中转失效
             if (!f) {
                 const m = this.members.value.get(uuid);
                 if (!m) return;
                 m.wgIp = "";
                 m.wgPort = 0;
-                const vlan = `${this.vlanPrefix}.${m.vlan >> 8}.${m.vlan & 0xff}`;
-                await wireguardFunc.addPeer(this.roomId, uuid, this.host, this.port, m.publicKey, [vlan], 1);
+                await wireguardFunc.delPeer(this.roomId, uuid);
             }
         });
     }
